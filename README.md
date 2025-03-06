@@ -1,71 +1,29 @@
-# cj-gitlab README
+# CJ gitlab 私服快速合并和发布测试
 
-This is the README for your extension "cj-gitlab". After writing up a brief description, we recommend including the following sections.
+## 功能特点
 
-## Features
+- 支持 CJ 项目一键发布到测试环境
+- 支持私服项目一键合并到 cn 和 master
+- 自动识别测试环境是 dev 还是 master， cn 环境是 master-cn 还是 cn， com 环境是 release 还是 master
+- 简化发布流程，提高工作效率
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## 使用方法
 
-For example if there is an image subfolder under your extension project workspace:
+在 vscode 配置如下
 
-\!\[feature X\]\(images/feature-x.png\)
+```
+"cj-gitlab.apiUrl": "http://192.168.5.143:1180",
+"cj-gitlab.token": "xxxxxx"
+```
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+获取 gitlab token页面
 
-## Requirements
+http://192.168.5.143:1180/profile/personal_access_tokens
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## 贡献指南
 
-## Extension Settings
+欢迎提交 Issue 和 Pull Request。
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## 许可证
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+MIT
