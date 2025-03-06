@@ -39,7 +39,14 @@ export class GitlabService {
       const projectName =
         remoteUrl.split("/").pop()?.replace(".git", "") || "Unknown Project";
       const res: Project[] = await this.getProjectsInfo(projectName);
-      return { ...res[0] };
+      if (res.length === 0) {
+        throw new Error("No projects found for the given name.");
+      }
+      const findProject = res.find((project) => project.name === projectName);
+      if (!findProject) {
+        throw new Error("No projects found for the given name.");
+      }
+      return findProject;
     } catch (error) {
       console.error("Failed to get project info:", error);
       return { name: "Unknown Project" } as unknown as Project;
