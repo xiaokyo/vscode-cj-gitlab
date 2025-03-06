@@ -25,6 +25,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
         case "publishToProd":
+          this.setLoading(true, "prod");
           const projectInfo = await this._gitlabService.getProjectInfo();
           const prodBranchName = await this._gitlabService.findProdBranch(
             projectInfo.id
@@ -32,18 +33,21 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           const { mergeRequestResponse } =
             await this._gitlabService.applyMergeRequest(prodBranchName);
           this.setMergeLinkProd(mergeRequestResponse.web_url);
+          this.setLoading(false, "prod");
           break;
         case "publishToCn":
+          this.setLoading(true, "cn");
           const projectInfo_cn = await this._gitlabService.getProjectInfo();
-          const prodBranchName_cn = await this._gitlabService.findProdBranch(
+          const prodBranchName_cn = await this._gitlabService.findCnBranch(
             projectInfo_cn.id
           );
           const { mergeRequestResponse: mergeRes } =
             await this._gitlabService.applyMergeRequest(prodBranchName_cn);
-          this.setMergeLinkProd(mergeRes.web_url);
+          this.setMergeLinkCn(mergeRes.web_url);
+          this.setLoading(false, "cn");
           break;
         case "publishToTest":
-          this.setLoading(true);
+          this.setLoading(true, "test");
           try {
             await this._gitlabService.publishDevloperEnv({
               mergeCallback: (mergeResponse) => {
@@ -56,7 +60,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
           } finally {
-            this.setLoading(false);
+            this.setLoading(false, "test");
           }
           break;
       }
@@ -72,14 +76,26 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     await this.updateContent();
   }
 
-  private setLoading(loading: boolean) {
+  private setLoading(
+    loading: boolean,
+    loadingType: "test" | "cn" | "prod" = "test"
+  ) {
     if (!this._view) return;
-    this._view.webview.postMessage({ type: "setLoading", loading });
+    this._view.webview.postMessage({
+      type: "setLoading",
+      loading,
+      loadingType,
+    });
   }
 
   private setMergeLink(link: string) {
     if (!this._view) return;
     this._view.webview.postMessage({ type: "merge_link", link });
+  }
+
+  private setMergeLinkCn(link: string) {
+    if (!this._view) return;
+    this._view.webview.postMessage({ type: "merge_link_cn", link });
   }
 
   private setMergeLinkProd(link: string) {
@@ -227,12 +243,14 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                   </div>
                   <button id="publishBtn" class="btn" onclick="publishToTest()">发布到测试环境</button>
 
-                  <button class="btn" onclick="publishToCn()">申请合并线上(Cn)</button>
+                  <button id="publishBtnCn" class="btn" onclick="publishToCn()">申请合并线上(Cn)</button>
 
-                  <button class="btn" onclick="publishToProd()">申请合并线上(Prod)</button>
+                  <button id="publishBtnProd" class="btn" onclick="publishToProd()">申请合并线上(Prod)</button>
                   <script>
                       const vscode = acquireVsCodeApi();
                       const publishBtn = document.getElementById('publishBtn');
+                      const publishBtnCn = document.getElementById('publishBtnCn');
+                      const publishBtnProd = document.getElementById('publishBtnProd');
 
                       function publishToTest() {
                         vscode.postMessage({ command: 'publishToTest' });
@@ -249,12 +267,34 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                       window.addEventListener('message', event => {
                           const message = event.data;
                           if (message.type === 'setLoading') {
-                              if (message.loading) {
+                              if (message.loadingType === 'test') {
+                                if (message.loading) {
                                   publishBtn.classList.add('loading');
                                   publishBtn.disabled = true;
-                              } else {
-                                  publishBtn.classList.remove('loading');
-                                  publishBtn.disabled = false;
+                                } else {
+                                    publishBtn.classList.remove('loading');
+                                    publishBtn.disabled = false;
+                                }
+                              }
+
+                              if (message.loadingType === 'cn') {
+                                if (message.loading) {
+                                  publishBtnCn.classList.add('loading');
+                                  publishBtnCn.disabled = true;
+                                } else {
+                                    publishBtnCn.classList.remove('loading');
+                                    publishBtnCn.disabled = false; 
+                                }
+                              }
+
+                              if (message.loadingType === 'prod') {
+                                if (message.loading) {
+                                  publishBtnProd.classList.add('loading');
+                                  publishBtnProd.disabled = true;
+                                } else {
+                                    publishBtnProd.classList.remove('loading');
+                                    publishBtnProd.disabled = false; 
+                                }
                               }
                           }
 
