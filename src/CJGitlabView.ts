@@ -33,7 +33,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
             );
             const { mergeRequestResponse } =
               await this._gitlabService.applyMergeRequest(prodBranchName);
-            this.setMergeLinkProd(mergeRequestResponse.web_url);
+            this.setMergeLink(mergeRequestResponse.web_url, "prod");
           } catch (err: any) {
             vscode.window.showErrorMessage(`Error: ${err.message}`);
           } finally {
@@ -49,7 +49,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
             );
             const { mergeRequestResponse: mergeRes } =
               await this._gitlabService.applyMergeRequest(prodBranchName_cn);
-            this.setMergeLinkCn(mergeRes.web_url);
+            this.setMergeLink(mergeRes.web_url, "cn");
           } catch (err: any) {
             vscode.window.showErrorMessage(`Error: ${err.message}`);
           } finally {
@@ -61,7 +61,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           try {
             await this._gitlabService.publishDevloperEnv({
               mergeCallback: (mergeResponse) => {
-                this.setMergeLink(mergeResponse.web_url);
+                this.setMergeLink(mergeResponse.web_url, "test");
               },
             });
             vscode.window.showInformationMessage(
@@ -86,31 +86,22 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     await this.updateContent();
   }
 
-  private setLoading(
-    loading: boolean,
-    loadingType: "test" | "cn" | "prod" = "test"
-  ) {
-    if (!this._view) return;
+  private setLoading(loading: boolean, env: "test" | "cn" | "prod" = "test") {
+    if (!this._view) {
+      return;
+    }
     this._view.webview.postMessage({
       type: "setLoading",
       loading,
-      loadingType,
+      env,
     });
   }
 
-  private setMergeLink(link: string) {
-    if (!this._view) return;
-    this._view.webview.postMessage({ type: "merge_link", link });
-  }
-
-  private setMergeLinkCn(link: string) {
-    if (!this._view) return;
-    this._view.webview.postMessage({ type: "merge_link_cn", link });
-  }
-
-  private setMergeLinkProd(link: string) {
-    if (!this._view) return;
-    this._view.webview.postMessage({ type: "merge_link_prod", link });
+  private setMergeLink(link: string, env: "test" | "cn" | "prod") {
+    if (!this._view) {
+      return;
+    }
+    this._view.webview.postMessage({ type: "merge_link", link, env });
   }
 
   private async updateContent() {
@@ -176,7 +167,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                           : ""
                       }
                       
-                      <div class="info-item" id="merge-link" style="display:none;">
+                      <div class="info-item" id="merge-link-test" style="display:none;">
                           <span class="info-label">合并链接(test)</span>
                           <span class="info-value"></span>
                       </div>
@@ -191,7 +182,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                           <span class="info-value"></span>
                       </div>
                   </div>
-                  <button id="publishBtn" class="btn" onclick="publishToTest()">发布到测试环境</button>
+                  <button id="publishBtnTest" class="btn" onclick="publishToTest()">发布到测试环境</button>
                   <button id="publishBtnCn" class="btn" onclick="publishToCn()">申请合并线上(Cn)</button>
                   <button id="publishBtnProd" class="btn" onclick="publishToProd()">申请合并线上(Prod)</button>
                   <script src="${scriptUri}"></script>

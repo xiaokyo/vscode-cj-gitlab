@@ -2,7 +2,7 @@
   "name": "cj-gitlab",
   "displayName": "CJ GitLab",
   "description": "GitLab integration for CJ project",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "xiaokyo",
   "icon": "resources/gitlab.png",
   "engines": {
@@ -11,9 +11,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:cjGitlab"
-  ],
+  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -36,7 +34,8 @@
         {
           "id": "cjGitlab",
           "name": "CJ GitLab",
-          "type": "webview"
+          "type": "webview",
+          "icon": "resources/gitlab.svg"
         }
       ]
     },

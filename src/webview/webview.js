@@ -1,7 +1,7 @@
 const vscode = acquireVsCodeApi();
 
 const elements = {
-    test: document.getElementById('publishBtn'),
+    test: document.getElementById('publishBtnTest'),
     cn: document.getElementById('publishBtnCn'),
     prod: document.getElementById('publishBtnProd')
 };
@@ -21,8 +21,8 @@ Object.entries(commands).forEach(([type, command]) => {
 
 // Message handlers
 const handlers = {
-    setLoading: ({ loading, loadingType }) => {
-        const button = elements[loadingType];
+    setLoading: ({ loading, env }) => {
+        const button = elements[env];
         if (!button) {
           return;
         }
@@ -31,8 +31,8 @@ const handlers = {
         button.disabled = loading;
     },
 
-    merge_link: ({ link, type = '' }) => {
-        const linkId = `merge-link${type ? '-' + type : ''}`;
+    merge_link: ({ link, type = '', env }) => {
+        const linkId = `merge-link-${env}`;
         const mergeLink = document.getElementById(linkId);
         if (!mergeLink) {
           return;
