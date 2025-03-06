@@ -126,10 +126,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
 
     const styleUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "src", "webview", "styles.css")
+      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "styles.css")
     );
     const scriptUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "src", "webview", "webview.js")
+      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "webview.js")
     );
 
     this._view.webview.html = `
