@@ -64,9 +64,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                 this.setMergeLink(mergeResponse.web_url, "test");
               },
             });
-            vscode.window.showInformationMessage(
-              "Merge request accepted successfully."
-            );
+            vscode.window.showInformationMessage("自动合并测试环境成功");
           } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
           } finally {
@@ -126,10 +124,20 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
 
     const styleUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "styles.css")
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "resources",
+        "webview",
+        "styles.css"
+      )
     );
     const scriptUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "webview.js")
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "resources",
+        "webview",
+        "webview.js"
+      )
     );
 
     this._view.webview.html = `
