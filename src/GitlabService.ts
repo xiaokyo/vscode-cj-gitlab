@@ -11,6 +11,7 @@ export class GitlabService {
   private readonly baseUrl: string;
   private readonly token: string;
   private testBranchName: string = "dev";
+  public projectInfo: Project | null = null;
 
   constructor() {
     const config = vscode.workspace.getConfiguration("cj-gitlab");
@@ -32,12 +33,10 @@ export class GitlabService {
 
   async getProjectInfo(): Promise<Project> {
     try {
-      // 获取远程仓库URL并提取项目名
-      const remoteUrl = await this.execCommand(
-        "git config --get remote.origin.url"
-      );
-      const projectName =
-        remoteUrl.split("/").pop()?.replace(".git", "") || "Unknown Project";
+      if (this.projectInfo?.id) {
+        return this.projectInfo;
+      }
+      const projectName = await this.getCurrentProjectName();
       const res: Project[] = await this.getProjectsInfo(projectName);
       if (res.length === 0) {
         throw new Error("No projects found for the given name.");
@@ -46,11 +45,22 @@ export class GitlabService {
       if (!findProject) {
         throw new Error("No projects found for the given name.");
       }
+      this.projectInfo = findProject;
       return findProject;
     } catch (error) {
       console.error("Failed to get project info:", error);
       return { name: "Unknown Project" } as unknown as Project;
     }
+  }
+
+  async getCurrentProjectName() {
+    // 获取远程仓库URL并提取项目名
+    const remoteUrl = await this.execCommand(
+      "git config --get remote.origin.url"
+    );
+    const projectName =
+      remoteUrl.split("/").pop()?.replace(".git", "") || "Unknown Project";
+    return projectName;
   }
 
   async getCurrentBranch(): Promise<string> {
@@ -152,12 +162,18 @@ export class GitlabService {
       throw new Error("Failed to get current branch");
     }
 
+    const isApply = await vscode.window.showQuickPick(["yes", "no"], {
+      placeHolder: `是否将${currentBranch}合并到${targetBranch}?`,
+    });
+    if (isApply !== "yes") {
+      throw new Error("User canceled merge request");
+    }
+
     const projectInfo = await this.getProjectInfo();
     if (!projectInfo.id) {
       throw new Error("Failed to get project info");
     }
     const sourceBranch = currentBranch;
-    // const targetBranch = this.testBranchName;
     const projectId = projectInfo.id;
 
     const mergeRequestResponse = await this.createMergeRequest(

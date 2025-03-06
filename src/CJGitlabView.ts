@@ -11,6 +11,22 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     this._gitlabService = new GitlabService();
   }
 
+  public async publishToTest() {
+    this.setLoading(true, "test");
+    try {
+      await this._gitlabService.publishDevloperEnv({
+        mergeCallback: (mergeResponse) => {
+          this.setMergeLink(mergeResponse.web_url, "test");
+        },
+      });
+      vscode.window.showInformationMessage("自动合并测试环境成功");
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Error: ${error.message}`);
+    } finally {
+      this.setLoading(false, "test");
+    }
+  }
+
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -57,19 +73,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           }
           break;
         case "publishToTest":
-          this.setLoading(true, "test");
-          try {
-            await this._gitlabService.publishDevloperEnv({
-              mergeCallback: (mergeResponse) => {
-                this.setMergeLink(mergeResponse.web_url, "test");
-              },
-            });
-            vscode.window.showInformationMessage("自动合并测试环境成功");
-          } catch (error: any) {
-            vscode.window.showErrorMessage(`Error: ${error.message}`);
-          } finally {
-            this.setLoading(false, "test");
-          }
+          this.publishToTest();
           break;
       }
     });
