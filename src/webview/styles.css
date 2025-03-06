@@ -1,0 +1,66 @@
+body {
+    padding: 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+    color: var(--vscode-foreground);
+}
+.project-card {
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+.info-item {
+    display: flex;
+    padding: 4px 0;
+    font-size: 12px;
+}
+.info-label {
+    color: var(--vscode-descriptionForeground);
+    width: 80px;
+    padding-right: 10px;
+    word-wrap: break-word;
+}
+.info-value {
+    flex: 1;
+    flex-shrink: 0;
+}
+.btn {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    width: 100%;
+    margin-bottom: 15px;
+}
+.btn:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.btn.loading {
+    position: relative;
+    color: transparent !important;
+}
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid var(--vscode-button-foreground);
+    border-radius: 50%;
+    border-right-color: transparent;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
