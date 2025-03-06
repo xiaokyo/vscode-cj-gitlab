@@ -23,7 +23,9 @@ Object.entries(commands).forEach(([type, command]) => {
 const handlers = {
     setLoading: ({ loading, loadingType }) => {
         const button = elements[loadingType];
-        if (!button) return;
+        if (!button) {
+          return;
+        }
         
         button.classList.toggle('loading', loading);
         button.disabled = loading;
@@ -32,7 +34,9 @@ const handlers = {
     merge_link: ({ link, type = '' }) => {
         const linkId = `merge-link${type ? '-' + type : ''}`;
         const mergeLink = document.getElementById(linkId);
-        if (!mergeLink) return;
+        if (!mergeLink) {
+          return;
+        }
 
         mergeLink.style.display = 'block';
         mergeLink.querySelector('.info-value').innerHTML = `<a href="${link}">${link}</a>`;
