@@ -149,9 +149,12 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                       .info-label {
                           color: var(--vscode-descriptionForeground);
                           width: 80px;
+                          padding-right: 10px;
+                          word-wrap: break-word;
                       }
                       .info-value {
                           flex: 1;
+                          flex-shrink: 0;
                       }
                       .btn {
                           background: var(--vscode-button-background);
@@ -197,18 +200,18 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
               <body>
                   <div class="project-card">
                       <div class="info-item">
-                          <span class="info-label">Project</span>
+                          <span class="info-label">项目名称</span>
                           <span class="info-value">${projectInfo.name}</span>
                       </div>
                       <div class="info-item">
-                          <span class="info-label">Branch</span>
+                          <span class="info-label">当前分支</span>
                           <span class="info-value">${currentBranch}</span>
                       </div>
                       ${
                         projectInfo.description
                           ? `
                       <div class="info-item">
-                          <span class="info-label">About</span>
+                          <span class="info-label">描述</span>
                           <span class="info-value">${projectInfo.description}</span>
                       </div>`
                           : ""
@@ -225,19 +228,19 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                       
                       <!-- Add merge link test -->
                       <div class="info-item" id="merge-link" style="display:none;">
-                          <span class="info-label">Merge Link(test)</span>
+                          <span class="info-label">合并链接(test)</span>
                           <span class="info-value"></span>
                       </div>
 
                       <!-- Add merge link cn -->
                       <div class="info-item" id="merge-link-cn" style="display:none;">
-                          <span class="info-label">Merge Link(cn)</span>
+                          <span class="info-label">合并链接(cn)</span>
                           <span class="info-value"></span>
                       </div>
 
                       <!-- Add merge link prod -->
                       <div class="info-item" id="merge-link-prod" style="display:none;">
-                          <span class="info-label">Merge Link(prod)</span>
+                          <span class="info-label">合并链接(prod)</span>
                           <span class="info-value"></span>
                       </div>
                   </div>
