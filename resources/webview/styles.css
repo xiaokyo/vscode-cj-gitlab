@@ -20,6 +20,7 @@ body {
     width: 80px;
     padding-right: 10px;
     word-wrap: break-word;
+    flex-shrink: 0;
 }
 .info-value {
     flex: 1;
