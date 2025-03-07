@@ -2,7 +2,7 @@
   "name": "cj-gitlab",
   "displayName": "CJ GitLab",
   "description": "GitLab integration for CJ project",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "publisher": "xiaokyo",
   "icon": "resources/gitlab.png",
   "engines": {
