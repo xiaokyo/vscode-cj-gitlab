@@ -25,6 +25,7 @@ body {
 .info-value {
     flex: 1;
     flex-shrink: 0;
+    word-break: break-all;
 }
 .btn {
     background: var(--vscode-button-background);
