@@ -2,17 +2,22 @@
   "name": "cj-gitlab",
   "displayName": "CJ GitLab",
   "description": "GitLab integration for CJ project",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "xiaokyo",
   "icon": "resources/gitlab.png",
   "engines": {
     "vscode": "^1.97.2"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaokyo/vscode-cj-gitlab"
+  },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "workspaceContains:.git"
   ],
   "main": "./dist/extension.js",
   "contributes": {
