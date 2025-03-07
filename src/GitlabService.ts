@@ -4,6 +4,7 @@ import { promisify } from "util";
 import { Project } from "./types/Project";
 import { MergeResponse } from "./types/MergeRequest";
 import { Branch } from "./types/Branch";
+import { MergeRequestN } from "./types/mergeRequestN";
 
 const execAsync = promisify(exec);
 
@@ -72,6 +73,46 @@ export class GitlabService {
     }
   }
 
+  // 检查分支是否已经合并
+  async isMerged(targetBranch: string): Promise<boolean> {
+    try {
+      const branch = await this.getCurrentBranch();
+      if (branch === targetBranch) {
+        throw new Error("isMerged: 当前分支和目标分支相同");
+      }
+      await this.execCommand(
+        `git fetch origin ${targetBranch}:${targetBranch}`
+      );
+      const stdout = await this.execCommand(
+        `git branch --merged ${targetBranch}`
+      );
+      const mergedBranches = stdout
+        .split("\n")
+        .map((b) => b.trim().replace(/\* /i, ""));
+
+      const isMerged = mergedBranches.includes(branch);
+      if (isMerged === false) {
+        // 再判断是否有合并请求
+        const projectInfo = await this.getProjectInfo();
+        const mergeRequests = await this.getMergeRequests(projectInfo?.id);
+        const isHasRequest = mergeRequests.find(
+          (mr) =>
+            mr.source_branch === branch && mr.target_branch === targetBranch
+        );
+        if (isHasRequest) {
+          setTimeout(() => {
+            vscode.env.openExternal(vscode.Uri.parse(isHasRequest.web_url));
+          }, 1000);
+          throw new Error(`当前分支有未合并的请求`);
+        }
+      }
+
+      return isMerged;
+    } catch (err: any) {
+      throw new Error(`Failed to check if branch is merged: ${err.message}`);
+    }
+  }
+
   async getProjectsInfo(projectName: string): Promise<Project[]> {
     const apiUrl = `${this.baseUrl}/api/v4/projects?search=${projectName}&private_token=${this.token}`;
     const response = await fetch(apiUrl, {
@@ -114,6 +155,23 @@ export class GitlabService {
     }
 
     return (await response.json()) as MergeResponse;
+  }
+
+  async getMergeRequests(projectId: number): Promise<MergeRequestN[]> {
+    // /api/v4/projects/1414/merge_requests
+    const apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/merge_requests?private_token=${this.token}&state=opened`;
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get merge requests: ${response.statusText}`);
+    }
+    const mergeRequests = await response.json();
+    return mergeRequests as MergeRequestN[];
   }
 
   async acceptMergeRequest(projectId: number, mergeRequestId: number) {
@@ -166,7 +224,12 @@ export class GitlabService {
       placeHolder: `是否将${currentBranch}合并到${targetBranch}?`,
     });
     if (isApply !== "yes") {
-      throw new Error("User canceled merge request");
+      throw new Error("用户取消合并");
+    }
+
+    const isMerged = await this.isMerged(targetBranch);
+    if (isMerged) {
+      throw new Error("当前分支已经合并到目标分支");
     }
 
     const projectInfo = await this.getProjectInfo();

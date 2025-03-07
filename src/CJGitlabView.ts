@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
+import Modal, { Toast } from "./utils/modal";
 
 export class CJGitlabView implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
@@ -19,9 +20,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           this.setMergeLink(mergeResponse.web_url, "test");
         },
       });
-      vscode.window.showInformationMessage("自动合并测试环境成功");
+      Toast.info("自动合并测试环境成功");
     } catch (error: any) {
-      vscode.window.showErrorMessage(`Error: ${error.message}`);
+      Modal.error(error.message);
     } finally {
       this.setLoading(false, "test");
     }
@@ -51,7 +52,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
               await this._gitlabService.applyMergeRequest(prodBranchName);
             this.setMergeLink(mergeRequestResponse.web_url, "prod");
           } catch (err: any) {
-            vscode.window.showErrorMessage(`Error: ${err.message}`);
+            Modal.error(`${err.message}`);
           } finally {
             this.setLoading(false, "prod");
           }
@@ -67,7 +68,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
               await this._gitlabService.applyMergeRequest(prodBranchName_cn);
             this.setMergeLink(mergeRes.web_url, "cn");
           } catch (err: any) {
-            vscode.window.showErrorMessage(`Error: ${err.message}`);
+            Modal.error(`Error: ${err.message}`);
           } finally {
             this.setLoading(false, "cn");
           }
@@ -114,6 +115,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     const projectInfo = await this._gitlabService.getProjectInfo();
     const currentBranch = await this._gitlabService.getCurrentBranch();
     await this._gitlabService.findTestBranch(projectInfo?.id);
+
+    this._gitlabService.getMergeRequests(projectInfo?.id);
 
     if (!projectInfo.id) {
       this._view.webview.html = `
