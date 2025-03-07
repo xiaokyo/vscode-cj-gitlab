@@ -21,13 +21,6 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "iconThemes": [
-      {
-        "id": "cj-gitlab-icons",
-        "label": "CJ GitLab Icons",
-        "path": "resources/gitlab.svg"
-      }
-    ],
     "commands": [
       {
         "command": "cj-gitlab.publishToTest",
