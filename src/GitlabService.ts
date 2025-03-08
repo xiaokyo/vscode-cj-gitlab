@@ -292,15 +292,10 @@ export class GitlabService {
       return "dev";
     }
     let branchs = await this.searchBranchs(projectId, "release");
-    if (branchs.length > 0) {
+    const isHasRelease = branchs.length > 0 && branchs.some((branch) => branch.name === "release");
+    if (isHasRelease) {
       this.testBranchName = "master";
       return "master";
-    }
-
-    branchs = await this.searchBranchs(projectId, "master-cn");
-    if (branchs.length > 0) {
-      this.testBranchName = "master-cn";
-      return "master-cn";
     }
 
     this.testBranchName = "dev";
