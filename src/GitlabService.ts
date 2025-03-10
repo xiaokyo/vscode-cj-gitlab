@@ -40,17 +40,17 @@ export class GitlabService {
       const projectName = await this.getCurrentProjectName();
       const res: Project[] = await this.getProjectsInfo(projectName);
       if (res.length === 0) {
-        throw new Error("No projects found for the given name.");
+        throw new Error("未找到相关项目");
       }
       const findProject = res.find((project) => project.name === projectName);
       if (!findProject) {
-        throw new Error("No projects found for the given name.");
+        throw new Error("未找到相关项目");
       }
       this.projectInfo = findProject;
       return findProject;
     } catch (error) {
-      console.error("Failed to get project info:", error);
-      return { name: "Unknown Project" } as unknown as Project;
+      console.error("获取项目信息失败:", error);
+      return { name: "未知项目" } as unknown as Project;
     }
   }
 
@@ -68,8 +68,8 @@ export class GitlabService {
     try {
       return await this.execCommand("git rev-parse --abbrev-ref HEAD");
     } catch (error) {
-      console.error("Failed to get current branch:", error);
-      return "unknown";
+      console.error("获取当前分支失败:", error);
+      return "未知分支";
     }
   }
 
@@ -109,7 +109,7 @@ export class GitlabService {
 
       return isMerged;
     } catch (err: any) {
-      throw new Error(`Failed to check if branch is merged: ${err.message}`);
+      throw new Error(`检查分支合并状态失败: ${err.message}`);
     }
   }
 
@@ -123,7 +123,7 @@ export class GitlabService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get projects info: ${response.statusText}`);
+      throw new Error(`获取项目信息失败: ${response.statusText}`);
     }
 
     return (await response.json()) as Project[];
@@ -151,7 +151,7 @@ export class GitlabService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create merge request: ${response.statusText}`);
+      throw new Error(`创建合并请求失败: ${response.statusText}`);
     }
 
     return (await response.json()) as MergeResponse;
@@ -168,7 +168,7 @@ export class GitlabService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get merge requests: ${response.statusText}`);
+      throw new Error(`获取合并请求失败: ${response.statusText}`);
     }
     const mergeRequests = await response.json();
     return mergeRequests as MergeRequestN[];
@@ -186,7 +186,7 @@ export class GitlabService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to accept merge request: ${response.statusText}`);
+      throw new Error(`同意合并请求失败: ${response.statusText}`);
     }
 
     return await response.json();
@@ -205,7 +205,7 @@ export class GitlabService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to search branches: ${response.statusText}`);
+      throw new Error(`搜索分支失败: ${response.statusText}`);
     }
 
     return (await response.json()) as Branch[];
@@ -217,7 +217,7 @@ export class GitlabService {
       throw new Error("这个分支不能发布到测试环境, 请切换至个人分支");
     }
     if (currentBranch === "unknown") {
-      throw new Error("Failed to get current branch");
+      throw new Error("获取当前分支失败");
     }
 
     const isApply = await vscode.window.showQuickPick(["yes", "no"], {
@@ -229,12 +229,14 @@ export class GitlabService {
 
     const isMerged = await this.isMerged(targetBranch);
     if (isMerged) {
-      throw new Error("当前分支已经合并到目标分支");
+      throw new Error(
+        `当前分支: ${currentBranch}已经合并到目标分支: ${targetBranch}`
+      );
     }
 
     const projectInfo = await this.getProjectInfo();
     if (!projectInfo.id) {
-      throw new Error("Failed to get project info");
+      throw new Error("获取项目信息失败");
     }
     const sourceBranch = currentBranch;
     const projectId = projectInfo.id;
@@ -245,7 +247,7 @@ export class GitlabService {
       targetBranch
     );
     if (!mergeRequestResponse?.iid) {
-      throw new Error("Failed to create merge request.");
+      throw new Error("创建合并请求失败");
     }
     return { projectId, mergeRequestResponse };
   }
@@ -268,7 +270,9 @@ export class GitlabService {
       return "master";
     }
     const branchs = await this.searchBranchs(projectId, "release");
-    if (branchs.length > 0) {
+    const isHasRelease =
+      branchs.length > 0 && branchs.some((branch) => branch.name === "release");
+    if (isHasRelease) {
       return "release";
     }
 
@@ -292,7 +296,8 @@ export class GitlabService {
       return "dev";
     }
     let branchs = await this.searchBranchs(projectId, "release");
-    const isHasRelease = branchs.length > 0 && branchs.some((branch) => branch.name === "release");
+    const isHasRelease =
+      branchs.length > 0 && branchs.some((branch) => branch.name === "release");
     if (isHasRelease) {
       this.testBranchName = "master";
       return "master";
@@ -300,5 +305,12 @@ export class GitlabService {
 
     this.testBranchName = "dev";
     return "dev";
+  }
+
+  async checkStatusNoCommit() {
+    const status = await this.execCommand("git status --porcelain");
+    if (status) {
+      throw new Error("有未提交的文件, 请先提交, 并推送到远程仓库");
+    }
   }
 }
