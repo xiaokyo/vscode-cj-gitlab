@@ -3,7 +3,7 @@
 ## 功能特点
 
 - 支持 CJ 项目一键发布到测试环境
-- 支持私服项目一键合并到 cn 和 master
+- 支持私服项目一键合并到 cn 和 com环境
 - 自动识别测试环境是 dev 还是 master， cn 环境是 master-cn 还是 cn， com 环境是 release 还是 master
 - 复制合并链接带上项目的信息。例：项目名称、最后一条commit信息、合并环境
 - 简化发布流程，提高工作效率
