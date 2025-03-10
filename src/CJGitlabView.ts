@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
 import { Toast } from "./utils/modal";
+import * as fs from "fs";
+import * as path from "path";
 
 export class CJGitlabView implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
@@ -91,6 +93,32 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
+  public async getProdAndCnInfo() {
+    try {
+      const cnRes = await this.publishToCn(true);
+      const prodRes = await this.publishToProd(true);
+      const cnContent = await this.copyLink({
+        env: "cn",
+        content: cnRes?.web_url || "",
+      });
+      const prodContent = await this.copyLink({
+        env: "prod",
+        content: prodRes?.web_url || "",
+      });
+      let content = "";
+      if (cnRes?.web_url) {
+        content += cnContent + "\n\n";
+      }
+      if (prodRes?.web_url) {
+        content += prodContent;
+      }
+      vscode.env.clipboard.writeText(content);
+      Toast.info(`已复制到剪贴板`);
+    } catch (error: any) {
+      Toast.error(error.message);
+    }
+  }
+
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -105,29 +133,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
         case "getProdAndCnInfo":
-          try {
-            const cnRes = await this.publishToCn(true);
-            const prodRes = await this.publishToProd(true);
-            const cnContent = await this.copyLink({
-              env: "cn",
-              content: cnRes?.web_url || "",
-            });
-            const prodContent = await this.copyLink({
-              env: "prod",
-              content: prodRes?.web_url || "",
-            });
-            let content = "";
-            if (cnRes?.web_url) {
-              content += cnContent + "\n\n";
-            }
-            if (prodRes?.web_url) {
-              content += prodContent;
-            }
-            vscode.env.clipboard.writeText(content);
-            Toast.info(`已复制到剪贴板`);
-          } catch (error: any) {
-            Toast.error(error.message);
-          }
+          this.getProdAndCnInfo();
           break;
         case "copyLink":
           try {
@@ -194,8 +200,6 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     const currentBranch = await this._gitlabService.getCurrentBranch();
     await this._gitlabService.findTestBranch(projectInfo?.id);
 
-    this._gitlabService.getMergeRequests(projectInfo?.id);
-
     if (!projectInfo.id) {
       this._view.webview.html = `
           <!DOCTYPE html>
@@ -217,68 +221,49 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       )
     );
     const scriptUri = this._view.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "main.js")
+    );
+
+    const vueScriptUri = this._view.webview.asWebviewUri(
       vscode.Uri.joinPath(
         this._extensionUri,
         "resources",
-        "webview",
-        "webview.js"
+        "assets",
+        "js",
+        "vue.2.7.16.min.js"
       )
+    );
+
+    const __INITIAL_STATE__ = {
+      projectInfo,
+      currentBranch,
+    };
+
+    const indexTemplate = fs.readFileSync(
+      path.join(
+        this._extensionUri.fsPath,
+        "resources",
+        "webview",
+        "index.html"
+      ),
+      "utf-8"
     );
 
     this._view.webview.html = `
           <!DOCTYPE html>
           <html>
               <head>
-                  <link rel="stylesheet" href="${styleUri}">
+                  <link rel="stylesheet" href="${styleUri}" />
+                  <script src="${vueScriptUri}"></script>
               </head>
               <body>
-                  <div class="project-card">
-                      <div class="info-item">
-                          <span class="info-label">项目名称</span>
-                          <span class="info-value">${projectInfo.name}</span>
-                      </div>
-                      <div class="info-item">
-                          <span class="info-label">当前分支</span>
-                          <span class="info-value">${currentBranch}</span>
-                      </div>
-                      ${
-                        projectInfo.description
-                          ? `
-                      <div class="info-item">
-                          <span class="info-label">描述</span>
-                          <span class="info-value">${projectInfo.description}</span>
-                      </div>`
-                          : ""
-                      }
-                      ${
-                        projectInfo.web_url
-                          ? `
-                      <div class="info-item">
-                          <span class="info-label">URL</span>
-                          <span class="info-value"><a href="${projectInfo.web_url}">${projectInfo.web_url}</a></span>
-                      </div>`
-                          : ""
-                      }
-                      
-                      <div class="info-item" id="merge-link-test" style="display:none;">
-                          <span class="info-label">合并链接(test)</span>
-                          <span class="info-value"></span>
-                      </div>
+                  ${indexTemplate}
 
-                      <div class="info-item" id="merge-link-cn" style="display:none;">
-                          <span class="info-label">合并链接(cn)</span>
-                          <span class="info-value"></span>
-                      </div>
-
-                      <div class="info-item" id="merge-link-prod" style="display:none;">
-                          <span class="info-label">合并链接(prod)</span>
-                          <span class="info-value"></span>
-                      </div>
-                  </div>
-                  <button id="publishBtnTest" class="btn" onclick="publishToTest()">发布到测试环境</button>
-                  <button id="publishBtnCn" class="btn" onclick="publishToCn()">申请合并线上(Cn)</button>
-                  <button id="publishBtnProd" class="btn" onclick="publishToProd()">申请合并线上(Com)</button>
-                  <button id="getProdAndCnInfo" class="btn" onclick="getProdAndCnInfo()">获取并复制合并信息(Cn + Com)</button>
+                  <script>
+                     window.__INITIAL_STATE__ = ${JSON.stringify(
+                       __INITIAL_STATE__
+                     )};
+                  </script>
                   <script src="${scriptUri}"></script>
               </body>
           </html>

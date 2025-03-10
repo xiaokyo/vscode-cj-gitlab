@@ -84,9 +84,6 @@ export class GitlabService {
       (mr) => mr.source_branch === branch && mr.target_branch === targetBranch
     );
     if (isHasRequest) {
-      // setTimeout(() => {
-      //   vscode.env.openExternal(vscode.Uri.parse(isHasRequest.web_url));
-      // }, 1000);
       return isHasRequest;
     }
     return null;

@@ -1,0 +1,45 @@
+<div id="app">
+
+  <h3>项目详情</h3>
+
+  <div class="project-card">
+    <div class="info-item">
+      <span class="info-label">项目名称</span>
+      <span class="info-value">{{state.projectInfo.name}}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">当前分支</span>
+      <span class="info-value">{{state.currentBranch}}</span>
+    </div>
+
+    <div class="info-item" v-if="state.projectInfo.description">
+      <span class="info-label">描述</span>
+      <span class="info-value">{{state.projectInfo.description}}</span>
+    </div>
+
+    <div class="info-item" v-if="state.projectInfo.web_url">
+      <span class="info-label">URL</span>
+      <span class="info-value"><a :href="state.projectInfo.web_url">{{state.projectInfo.web_url}}</a></span>
+    </div>
+  </div>
+
+  <h3 v-if="hasMergeLinks">合并链接</h3>
+
+  <div class="project-card" v-if="hasMergeLinks"v>
+    <div class="info-item" v-for="[env, url] in Object.entries(mergeLinks)" :key="env" v-if="url">
+      <span class="info-label">{{ env }}</span>
+      <span class="info-value">
+        <a :href="url" :alt="url">访问</a>
+        <a href="#self" @click="vsPostMsg({ command: 'copyLink', content: url, env })">复制</a>
+      </span>
+    </div>
+  </div>
+
+  <button class="btn" :class="{'loading': loading.test}"
+    @click="vsPostMsg({ command: 'publishToTest' })">发布到测试环境</button>
+  <button class="btn" :class="{'loading': loading.cn}"
+    @click="vsPostMsg({ command: 'publishToCn' })">申请合并线上(Cn)</button>
+  <button class="btn" :class="{'loading': loading.prod}"
+    @click="vsPostMsg({ command: 'publishToProd' })">申请合并线上(Com)</button>
+  <button class="btn" @click="vsPostMsg({ command: 'getProdAndCnInfo' })">获取并复制合并信息(Cn + Com)</button>
+</div>
