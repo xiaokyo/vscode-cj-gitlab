@@ -113,6 +113,9 @@ export class GitlabService {
 
       return isMerged;
     } catch (err: any) {
+      if (err.message.includes("Command failed: git fetch")) {
+        throw new Error(`目标分支${targetBranch}不存在`);
+      }
       throw new Error(`检查分支合并状态失败: ${err.message}`);
     }
   }
