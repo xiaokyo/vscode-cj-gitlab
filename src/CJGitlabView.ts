@@ -29,6 +29,68 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
+  public async publishToProd(userForce = false) {
+    this.setLoading(true, "prod");
+    try {
+      await this._gitlabService.checkStatusNoCommit();
+      const projectInfo = await this._gitlabService.getProjectInfo();
+      const prodBranchName = await this._gitlabService.findProdBranch(
+        projectInfo.id
+      );
+      const { mergeRequestResponse } =
+        await this._gitlabService.applyMergeRequest(prodBranchName, userForce);
+      this.setMergeLink(mergeRequestResponse.web_url, "prod");
+      return mergeRequestResponse;
+    } catch (err: any) {
+      Toast.error(`${err.message}`);
+      return null;
+    } finally {
+      this.setLoading(false, "prod");
+    }
+  }
+
+  public async publishToCn(userForce = false) {
+    this.setLoading(true, "cn");
+    try {
+      await this._gitlabService.checkStatusNoCommit();
+      const projectInfo_cn = await this._gitlabService.getProjectInfo();
+      const prodBranchName_cn = await this._gitlabService.findCnBranch(
+        projectInfo_cn.id
+      );
+      const { mergeRequestResponse: mergeRes } =
+        await this._gitlabService.applyMergeRequest(
+          prodBranchName_cn,
+          userForce
+        );
+      this.setMergeLink(mergeRes.web_url, "cn");
+      return mergeRes;
+    } catch (err: any) {
+      Toast.error(`${err.message}`);
+      return null;
+    } finally {
+      this.setLoading(false, "cn");
+    }
+  }
+
+  public async copyLink(data: { env: string; content: string }) {
+    try {
+      const projectInfo = await this._gitlabService.getProjectInfo();
+      const envMap = {
+        test: "测试",
+        cn: "线上(CN)",
+        prod: "线上(COM)",
+      } as const;
+      const env = envMap[data.env as keyof typeof envMap];
+      const link = data.content;
+      const commitLastLog = await this._gitlabService.getCommitLogLastTitle();
+      const content = `项目名称：${projectInfo.name}\ncommit信息: ${commitLastLog}\n合并环境: ${env}\n链接: ${link}`;
+      return content;
+    } catch (error: any) {
+      Toast.error(error.message);
+      return "";
+    }
+  }
+
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -42,39 +104,52 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
-        case "publishToProd":
-          this.setLoading(true, "prod");
+        case "getProdAndCnInfo":
           try {
-            await this._gitlabService.checkStatusNoCommit();
-            const projectInfo = await this._gitlabService.getProjectInfo();
-            const prodBranchName = await this._gitlabService.findProdBranch(
-              projectInfo.id
-            );
-            const { mergeRequestResponse } =
-              await this._gitlabService.applyMergeRequest(prodBranchName);
-            this.setMergeLink(mergeRequestResponse.web_url, "prod");
-          } catch (err: any) {
-            Toast.error(`${err.message}`);
-          } finally {
-            this.setLoading(false, "prod");
+            const cnRes = await this.publishToCn(true);
+            const prodRes = await this.publishToProd(true);
+            const cnContent = await this.copyLink({
+              env: "cn",
+              content: cnRes?.web_url || "",
+            });
+            const prodContent = await this.copyLink({
+              env: "prod",
+              content: prodRes?.web_url || "",
+            });
+            let content = "";
+            if (cnRes?.web_url) {
+              content += cnContent + "\n\n";
+            }
+            if (prodRes?.web_url) {
+              content += prodContent;
+            }
+            vscode.env.clipboard.writeText(content);
+            Toast.info(`已复制到剪贴板`);
+          } catch (error: any) {
+            Toast.error(error.message);
           }
           break;
-        case "publishToCn":
-          this.setLoading(true, "cn");
+        case "copyLink":
           try {
-            await this._gitlabService.checkStatusNoCommit();
-            const projectInfo_cn = await this._gitlabService.getProjectInfo();
-            const prodBranchName_cn = await this._gitlabService.findCnBranch(
-              projectInfo_cn.id
-            );
-            const { mergeRequestResponse: mergeRes } =
-              await this._gitlabService.applyMergeRequest(prodBranchName_cn);
-            this.setMergeLink(mergeRes.web_url, "cn");
-          } catch (err: any) {
-            Toast.error(`${err.message}`);
-          } finally {
-            this.setLoading(false, "cn");
+            const content = await this.copyLink(data);
+            vscode.env.clipboard.writeText(content);
+            Toast.info(`已复制到剪贴板`);
+          } catch (error: any) {
+            Toast.error(error.message);
           }
+          break;
+        case "showMessage":
+          Toast.info(data.content);
+          break;
+        case "copyText":
+          vscode.env.clipboard.writeText(data.content);
+          Toast.info(`${data.content}, 已复制到剪贴板`);
+          break;
+        case "publishToProd":
+          this.publishToProd();
+          break;
+        case "publishToCn":
+          this.publishToCn();
           break;
         case "publishToTest":
           this.publishToTest();
@@ -202,7 +277,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                   </div>
                   <button id="publishBtnTest" class="btn" onclick="publishToTest()">发布到测试环境</button>
                   <button id="publishBtnCn" class="btn" onclick="publishToCn()">申请合并线上(Cn)</button>
-                  <button id="publishBtnProd" class="btn" onclick="publishToProd()">申请合并线上(Prod)</button>
+                  <button id="publishBtnProd" class="btn" onclick="publishToProd()">申请合并线上(Com)</button>
+                  <button id="getProdAndCnInfo" class="btn" onclick="getProdAndCnInfo()">获取并复制合并信息(Cn + Com)</button>
                   <script src="${scriptUri}"></script>
               </body>
           </html>

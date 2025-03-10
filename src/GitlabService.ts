@@ -73,6 +73,25 @@ export class GitlabService {
     }
   }
 
+  async hasUnMergedRequest(
+    targetBranch: string
+  ): Promise<MergeRequestN | null> {
+    // 再判断是否有合并请求
+    const branch = await this.getCurrentBranch();
+    const projectInfo = await this.getProjectInfo();
+    const mergeRequests = await this.getMergeRequests(projectInfo?.id);
+    const isHasRequest = mergeRequests.find(
+      (mr) => mr.source_branch === branch && mr.target_branch === targetBranch
+    );
+    if (isHasRequest) {
+      // setTimeout(() => {
+      //   vscode.env.openExternal(vscode.Uri.parse(isHasRequest.web_url));
+      // }, 1000);
+      return isHasRequest;
+    }
+    return null;
+  }
+
   // 检查分支是否已经合并
   async isMerged(targetBranch: string): Promise<boolean> {
     try {
@@ -91,21 +110,6 @@ export class GitlabService {
         .map((b) => b.trim().replace(/\* /i, ""));
 
       const isMerged = mergedBranches.includes(branch);
-      if (isMerged === false) {
-        // 再判断是否有合并请求
-        const projectInfo = await this.getProjectInfo();
-        const mergeRequests = await this.getMergeRequests(projectInfo?.id);
-        const isHasRequest = mergeRequests.find(
-          (mr) =>
-            mr.source_branch === branch && mr.target_branch === targetBranch
-        );
-        if (isHasRequest) {
-          setTimeout(() => {
-            vscode.env.openExternal(vscode.Uri.parse(isHasRequest.web_url));
-          }, 1000);
-          throw new Error(`当前分支有未合并的请求`);
-        }
-      }
 
       return isMerged;
     } catch (err: any) {
@@ -129,6 +133,12 @@ export class GitlabService {
     return (await response.json()) as Project[];
   }
 
+  async getCommitLogLastTitle(): Promise<string> {
+    const commitMessage = await this.execCommand("git log -1 --pretty=%B");
+    const title = commitMessage.split("\n")[0];
+    return title || "";
+  }
+
   async createMergeRequest(
     projectId: number,
     sourceBranch: string,
@@ -136,8 +146,7 @@ export class GitlabService {
   ): Promise<MergeResponse> {
     // Implementation will be added when you provide the curl endpoints
     const apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/merge_requests?private_token=${this.token}`;
-    const commitMessage = await this.execCommand("git log -1 --pretty=%B");
-    const title = commitMessage.split("\n")[0];
+    const title = await this.getCommitLogLastTitle();
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -211,7 +220,7 @@ export class GitlabService {
     return (await response.json()) as Branch[];
   }
 
-  async applyMergeRequest(targetBranch: string) {
+  async applyMergeRequest(targetBranch: string, userForce = false) {
     const currentBranch = await this.getCurrentBranch();
     if (["master", "release", "cn"].includes(currentBranch)) {
       throw new Error("这个分支不能发布到测试环境, 请切换至个人分支");
@@ -220,11 +229,13 @@ export class GitlabService {
       throw new Error("获取当前分支失败");
     }
 
-    const isApply = await vscode.window.showQuickPick(["yes", "no"], {
-      placeHolder: `是否将${currentBranch}合并到${targetBranch}?`,
-    });
-    if (isApply !== "yes") {
-      throw new Error("用户取消合并");
+    if (!userForce) {
+      const isApply = await vscode.window.showQuickPick(["yes", "no"], {
+        placeHolder: `是否将${currentBranch}合并到${targetBranch}?`,
+      });
+      if (isApply !== "yes") {
+        throw new Error("用户取消合并");
+      }
     }
 
     const isMerged = await this.isMerged(targetBranch);
@@ -238,8 +249,17 @@ export class GitlabService {
     if (!projectInfo.id) {
       throw new Error("获取项目信息失败");
     }
+
     const sourceBranch = currentBranch;
     const projectId = projectInfo.id;
+
+    const hasUnMergedRequest = await this.hasUnMergedRequest(targetBranch);
+    if (hasUnMergedRequest) {
+      return {
+        projectId,
+        mergeRequestResponse: hasUnMergedRequest as MergeResponse,
+      };
+    }
 
     const mergeRequestResponse = await this.createMergeRequest(
       projectId,
