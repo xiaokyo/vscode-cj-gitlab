@@ -230,7 +230,7 @@ export class GitlabService {
     const isMerged = await this.isMerged(targetBranch);
     if (isMerged) {
       throw new Error(
-        `当前分支: ${currentBranch}已经合并到目标分支: ${targetBranch}`
+        `当前分支: ${currentBranch} 已经合并到目标分支: ${targetBranch}`
       );
     }
 
