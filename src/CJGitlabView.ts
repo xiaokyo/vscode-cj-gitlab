@@ -9,9 +9,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private readonly _extensionUri: vscode.Uri;
   private _gitlabService: GitlabService;
 
-  constructor(extensionUri: vscode.Uri) {
+  constructor(extensionUri: vscode.Uri, gitlabService: GitlabService) {
     this._extensionUri = extensionUri;
-    this._gitlabService = new GitlabService();
+    this._gitlabService = gitlabService;
   }
 
   public async publishToTest() {

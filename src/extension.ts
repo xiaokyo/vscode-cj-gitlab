@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 import { CJGitlabView } from "./CJGitlabView";
 import StatusBar from "./StatusBar";
+import { GitlabService } from "./GitlabService";
 
 export function activate(context: vscode.ExtensionContext) {
-  const statusBar = new StatusBar();
-  const provider = new CJGitlabView(context.extensionUri);
+  const gitlabService = new GitlabService();
+  const statusBar = new StatusBar(gitlabService);
+  const provider = new CJGitlabView(context.extensionUri, gitlabService);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("cjGitlab", provider, {
