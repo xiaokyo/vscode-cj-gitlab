@@ -1,36 +1,25 @@
 import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
+import GitWatch from "./GitWatch";
 
 export default class StatusBar {
   private _statusBarItem: vscode.StatusBarItem;
   private _gitlabService: GitlabService;
+  private _gitWatch: GitWatch;
 
-  constructor(gitlabService: GitlabService) {
+  constructor(gitlabService: GitlabService, gitWatch: GitWatch) {
     this._statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       100
     );
     this._gitlabService = gitlabService;
+    this._gitWatch = gitWatch;  
     this.refreshBranch();
     this.listenGitBranchChange();
   }
 
   private listenGitBranchChange() {
-    // 监听 git 仓库变化
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("git")) {
-        this.refreshBranch();
-      }
-    });
-
-    // 监听工作区文件变化
-    const watcher = vscode.workspace.createFileSystemWatcher("**/.git/HEAD");
-    watcher.onDidChange(() => {
-      this.refreshBranch();
-    });
-    watcher.onDidCreate(() => {
-      this.refreshBranch();
-    });
+    this._gitWatch.add(this.refreshBranch.bind(this));
   }
 
   private refreshBranch() {
@@ -41,7 +30,7 @@ export default class StatusBar {
       .then(([branch, projectInfo]) => {
         if (projectInfo.id) {
           this._gitlabService
-            .findTestBranch(projectInfo.id)
+            .getTestBranch()
             .then((testBranch) => {
               this.setText(
                 `【${projectInfo.name}】${branch} merge ${testBranch}`

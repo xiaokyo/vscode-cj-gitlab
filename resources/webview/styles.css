@@ -98,3 +98,55 @@ body {
     font-size: 14px;
     line-height: 1;
 }
+
+.error {
+    color: var(--vscode-errorForeground);
+}
+
+.stash-files {
+    margin-bottom: 16px;
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.stash-file {
+    padding: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid var(--vscode-widget-border);
+    color: var(--vscode-foreground);
+}
+
+.stash-file .file-name {
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.stash-file .file-path {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.stash-file:last-child {
+    border-bottom: none;
+}
+
+.stash-file:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.stash-file:active {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.stash-file::before {
+    content: "📄";
+    margin-right: 8px;
+    font-size: 14px;
+}

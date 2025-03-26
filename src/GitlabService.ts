@@ -11,7 +11,7 @@ const execAsync = promisify(exec);
 export class GitlabService {
   private readonly baseUrl: string;
   private readonly token: string;
-  private testBranchName: string = "dev";
+  public testBranchName: string = "";
   public projectInfo: Project | null = null;
 
   constructor() {
@@ -277,8 +277,9 @@ export class GitlabService {
   }: {
     mergeCallback?: (mergeRequest: MergeResponse) => void;
   } = {}): Promise<MergeResponse> {
+    const testBranch = await this.getTestBranch();
     const { projectId, mergeRequestResponse } = await this.applyMergeRequest(
-      this.testBranchName
+      testBranch
     );
     mergeCallback?.(mergeRequestResponse);
     await this.acceptMergeRequest(projectId, mergeRequestResponse.iid);
@@ -311,20 +312,21 @@ export class GitlabService {
     return "cn";
   }
 
-  async findTestBranch(projectId: number) {
-    if (!projectId) {
-      return "dev";
+  async getTestBranch() {
+    const { id: projectId } = await this.getProjectInfo();
+    if (this.testBranchName) {
+      return this.testBranchName;
     }
     let branchs = await this.searchBranchs(projectId, "release");
     const isHasRelease =
       branchs.length > 0 && branchs.some((branch) => branch.name === "release");
     if (isHasRelease) {
       this.testBranchName = "master";
-      return "master";
+      return this.testBranchName;
     }
 
     this.testBranchName = "dev";
-    return "dev";
+    return this.testBranchName;
   }
 
   async checkStatusNoCommit() {
@@ -332,5 +334,14 @@ export class GitlabService {
     if (status) {
       throw new Error("有未提交的文件, 请先提交, 并推送到远程仓库");
     }
+  }
+
+  async getNoCommitFiles() {
+    const status = await this.execCommand("git status --porcelain");
+    const files = status.split("\n").map((line) => line.trim().split(" ")[1]);
+    const noCommitFiles = files.filter(
+      (name) => Boolean(name) && name !== "undefined"
+    );
+    return noCommitFiles;
   }
 }

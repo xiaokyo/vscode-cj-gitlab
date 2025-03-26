@@ -3,15 +3,35 @@ import { GitlabService } from "./GitlabService";
 import { Toast } from "./utils/modal";
 import * as fs from "fs";
 import * as path from "path";
+import GitWatch from "./GitWatch";
+function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout;
+  return function (this: any, ...args: Parameters<T>) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+}
 
 export class CJGitlabView implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private readonly _extensionUri: vscode.Uri;
   private _gitlabService: GitlabService;
-
-  constructor(extensionUri: vscode.Uri, gitlabService: GitlabService) {
+  private debouncedUpdateContent: () => void;
+  private _gitWatch: GitWatch;
+  constructor(
+    extensionUri: vscode.Uri,
+    gitlabService: GitlabService,
+    gitWatch: GitWatch
+  ) {
     this._extensionUri = extensionUri;
     this._gitlabService = gitlabService;
+    this._gitWatch = gitWatch;
+    this.debouncedUpdateContent = debounce(this.updateContent.bind(this), 300);
   }
 
   public async publishToTest() {
@@ -160,15 +180,27 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         case "publishToTest":
           this.publishToTest();
           break;
+        case "openFile":
+          try {
+            const filePath = vscode.Uri.file(
+              path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || "", data.content)
+            );
+            vscode.window.showTextDocument(filePath);
+          } catch (error: any) {
+            Toast.error(error.message);
+          }
+          break;
       }
     });
 
     // Listen for visibility changes to refresh content
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
-        this.updateContent();
+        this.debouncedUpdateContent();
       }
     });
+
+    this._gitWatch.add(this.debouncedUpdateContent.bind(this));
 
     await this.updateContent();
   }
@@ -191,6 +223,21 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     this._view.webview.postMessage({ type: "merge_link", link, env });
   }
 
+  private getScriptUris() {
+    const scripts = {
+      main: ["webview", "main.js"],
+      vue: ["assets", "js", "vue.2.7.16.min.js"],
+      // 在这里可以方便地添加更多脚本
+    };
+
+    return Object.entries(scripts).reduce((acc, [key, paths]) => {
+      acc[key] = this._view!.webview.asWebviewUri(
+        vscode.Uri.joinPath(this._extensionUri, "resources", ...paths)
+      );
+      return acc;
+    }, {} as Record<string, vscode.Uri>);
+  }
+
   private async updateContent() {
     if (!this._view) {
       return;
@@ -198,7 +245,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
     const projectInfo = await this._gitlabService.getProjectInfo();
     const currentBranch = await this._gitlabService.getCurrentBranch();
-    await this._gitlabService.findTestBranch(projectInfo?.id);
+    await this._gitlabService.getTestBranch();
 
     if (!projectInfo.id) {
       this._view.webview.html = `
@@ -220,23 +267,15 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         "styles.css"
       )
     );
-    const scriptUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "resources", "webview", "main.js")
-    );
 
-    const vueScriptUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this._extensionUri,
-        "resources",
-        "assets",
-        "js",
-        "vue.2.7.16.min.js"
-      )
-    );
+    const scripts = this.getScriptUris();
+
+    const stashFiles = await this._gitlabService.getNoCommitFiles();
 
     const __INITIAL_STATE__ = {
       projectInfo,
       currentBranch,
+      stashFiles,
     };
 
     const indexTemplate = fs.readFileSync(
@@ -254,7 +293,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           <html>
               <head>
                   <link rel="stylesheet" href="${styleUri}" />
-                  <script src="${vueScriptUri}"></script>
+                  <script src="${scripts.vue}"></script>
               </head>
               <body>
                   ${indexTemplate}
@@ -264,7 +303,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                        __INITIAL_STATE__
                      )};
                   </script>
-                  <script src="${scriptUri}"></script>
+                  <script src="${scripts.main}"></script>
               </body>
           </html>
       `;

@@ -1,5 +1,13 @@
 <div id="app">
 
+  <h3 v-if="state.stashFiles.length > 0" class="error">当前分支有未提交文件</h3>
+  <div class="stash-files" v-if="state.stashFiles.length > 0">
+    <div class="stash-file" v-for="file in state.stashFiles" :key="file"
+      @click="vsPostMsg({ command: 'openFile', content: file })">
+      <span class="file-name">{{ formatFileName(file) }}</span>
+    </div>
+  </div>
+
   <h3>项目详情</h3>
 
   <div class="project-card">
@@ -13,19 +21,19 @@
     </div>
 
     <div class="info-item" v-if="state.projectInfo.description">
-      <span class="info-label">描述</span>
+      <span class="info-label">项目描述</span>
       <span class="info-value">{{state.projectInfo.description}}</span>
     </div>
 
     <div class="info-item" v-if="state.projectInfo.web_url">
-      <span class="info-label">URL</span>
-      <span class="info-value"><a :href="state.projectInfo.web_url">{{state.projectInfo.web_url}}</a></span>
+      <span class="info-label">项目地址</span>
+      <span class="info-value"><a :href="state.projectInfo.web_url">点击访问</a></span>
     </div>
   </div>
 
   <h3 v-if="hasMergeLinks">合并链接</h3>
 
-  <div class="project-card" v-if="hasMergeLinks"v>
+  <div class="project-card" v-if="hasMergeLinks" v>
     <div class="info-item" v-for="[env, url] in Object.entries(mergeLinks)" :key="env" v-if="url">
       <span class="info-label">{{ mergeLinksLabel[env] }}</span>
       <span class="info-value">
@@ -41,16 +49,13 @@
     </div>
   </div>
 
-  <button class="btn" :class="{'loading': loading.test}"
-    @click="vsPostMsg({ command: 'publishToTest' })">
+  <button class="btn" :class="{'loading': loading.test}" @click="vsPostMsg({ command: 'publishToTest' })">
     <span class="icon">🚀</span> 发布测试站
   </button>
-  <button class="btn" :class="{'loading': loading.cn}"
-    @click="vsPostMsg({ command: 'publishToCn' })">
+  <button class="btn" :class="{'loading': loading.cn}" @click="vsPostMsg({ command: 'publishToCn' })">
     <span class="icon">🌐</span> 发布国内站
   </button>
-  <button class="btn" :class="{'loading': loading.prod}"
-    @click="vsPostMsg({ command: 'publishToProd' })">
+  <button class="btn" :class="{'loading': loading.prod}" @click="vsPostMsg({ command: 'publishToProd' })">
     <span class="icon">🌍</span> 发布COM站
   </button>
   <button class="btn" @click="vsPostMsg({ command: 'getProdAndCnInfo' })">
