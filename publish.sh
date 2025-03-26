@@ -13,7 +13,7 @@ NEW_VERSION=$(node -p "require('./package.json').version")
 # 提交并推送更改
 git add package.json
 git commit -m "chore: bump version to v$NEW_VERSION"
-git push origin main
+git push origin master
 git push --tags
 
 # 切换到 Node.js 18
