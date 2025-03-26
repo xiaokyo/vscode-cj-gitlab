@@ -37,6 +37,10 @@ body {
     font-size: 12px;
     width: 100%;
     margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 .btn:hover {
     background: var(--vscode-button-hoverBackground);
@@ -65,4 +69,32 @@ body {
 }
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+.btn .icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    font-size: 12px;
+    margin-right: 8px;
+    transition: background-color 0.2s;
+}
+
+.link-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+    text-decoration: none;
+}
+
+.link-btn .icon {
+    font-size: 14px;
+    line-height: 1;
 }

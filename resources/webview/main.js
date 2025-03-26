@@ -21,6 +21,11 @@ new Vue({
         cn: false,
         prod: false,
       },
+      mergeLinksLabel: {
+        test: "测试站",
+        cn: "国内站",
+        prod: "COM站",
+      },
     };
   },
 
