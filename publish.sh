@@ -15,7 +15,6 @@ git push origin master
 
 # 切换到 Node.js 18
 echo "切换到 Node.js 18..."
-. ~/.nvm/nvm.sh  # 加载 nvm
 nvm use 18
 
 # 执行 vsce publish
