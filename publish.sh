@@ -14,7 +14,6 @@ NEW_VERSION=$(node -p "require('./package.json').version")
 git add package.json
 git commit -m "chore: bump version to v$NEW_VERSION"
 git push origin master
-git push --tags
 
 # 切换到 Node.js 18
 echo "切换到 Node.js 18..."
