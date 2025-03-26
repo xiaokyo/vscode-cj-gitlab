@@ -10,8 +10,6 @@ npm version patch
 # 获取新的版本号
 NEW_VERSION=$(node -p "require('./package.json').version")
 
-git tag -d v$NEW_VERSION
-
 # 提交并推送更改
 git push origin master
 
