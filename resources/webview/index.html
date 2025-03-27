@@ -1,64 +1,102 @@
-<div id="app">
+<div id="app" class="container">
+  <!-- 项目信息头部 -->
+  <header class="app-header">
+    <div class="project-title">
+      <h3>{{state.projectInfo.name}}</h3>
+      <div class="branch-badge">{{state.currentBranch}}</div>
+    </div>
+    <p v-if="state.projectInfo.description" class="project-description">
+      {{state.projectInfo.description}}
+    </p>
+  </header>
 
-  <h3 v-if="state.stashFiles.length > 0" class="error">当前分支有未提交文件</h3>
-  <div class="stash-files" v-if="state.stashFiles.length > 0">
-    <div class="stash-file" v-for="file in state.stashFiles" :key="file"
-      @click="vsPostMsg({ command: 'openFile', content: file })">
-      <span class="file-name">{{ formatFileName(file) }}</span>
+  <!-- 未提交文件警告 -->
+  <div v-if="state.stashFiles.length > 0" class="notification notification-warning">
+    <div class="notification-header">
+      <span class="notification-icon">⚠️</span>
+      <h3>未提交更改</h3>
+    </div>
+    <div class="notification-content">
+      <div class="file-list">
+        <div class="file-item" v-for="file in state.stashFiles" :key="file"
+          @click="vsPostMsg({ command: 'openFile', content: file })">
+          <span class="file-item-icon">📄</span>
+          <span class="file-item-name">{{ formatFileName(file) }}</span>
+          <span class="file-item-action">查看 →</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <h3>项目详情</h3>
+  <!-- 快捷操作区 -->
+  <div class="quick-actions">
+    <button class="quick-action-btn primary" :class="{'loading': loading.test}" 
+      @click="vsPostMsg({ command: 'publishToTest' })">
+      <span class="quick-action-icon">🚀</span>
+      <div class="quick-action-content">
+        <span class="quick-action-title">发布测试站</span>
+        <span class="quick-action-desc">部署到测试环境</span>
+      </div>
+    </button>
+    
+    <button class="quick-action-btn" :class="{'loading': loading.cn}" 
+      @click="vsPostMsg({ command: 'publishToCn' })">
+      <span class="quick-action-icon">🌐</span>
+      <div class="quick-action-content">
+        <span class="quick-action-title">发布国内站</span>
+        <span class="quick-action-desc">部署到国内生产环境</span>
+      </div>
+    </button>
+    
+    <button class="quick-action-btn" :class="{'loading': loading.prod}" 
+      @click="vsPostMsg({ command: 'publishToProd' })">
+      <span class="quick-action-icon">🌍</span>
+      <div class="quick-action-content">
+        <span class="quick-action-title">发布COM站</span>
+        <span class="quick-action-desc">部署到国际生产环境</span>
+      </div>
+    </button>
 
-  <div class="project-card">
-    <div class="info-item">
-      <span class="info-label">项目名称</span>
-      <span class="info-value">{{state.projectInfo.name}}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">当前分支</span>
-      <span class="info-value">{{state.currentBranch}}</span>
-    </div>
+    <button class="quick-action-btn" :class="{'loading': loading.prod}" 
+      @click="vsPostMsg({ command: 'getProdAndCnInfo' })">
+      <span class="quick-action-icon">📋</span>
+      <div class="quick-action-content">
+        <span class="quick-action-title">复制所有</span>
+        <span class="quick-action-desc">复制所有合并请求链接</span>
+      </div>
+  </div>
 
-    <div class="info-item" v-if="state.projectInfo.description">
-      <span class="info-label">项目描述</span>
-      <span class="info-value">{{state.projectInfo.description}}</span>
+  <!-- 合并链接面板 -->
+  <div class="panel" v-if="hasMergeLinks">
+    <div class="panel-header">
+      <h2>合并请求</h2>
     </div>
-
-    <div class="info-item" v-if="state.projectInfo.web_url">
-      <span class="info-label">项目地址</span>
-      <span class="info-value"><a :href="state.projectInfo.web_url">点击访问</a></span>
+    <div class="panel-content">
+      <div class="merge-request-list">
+        <div class="merge-request-item" v-for="[env, url] in Object.entries(mergeLinks)" :key="env" v-if="url">
+          <div class="merge-request-info">
+            <span class="merge-request-env">{{ mergeLinksLabel[env] }}</span>
+            <div class="merge-request-actions">
+              <a :href="url" class="merge-action-link" target="_blank">
+                <span class="merge-action-icon">🔗</span>
+                <span>查看</span>
+              </a>
+              <button class="merge-action-btn" @click="vsPostMsg({ command: 'copyLink', content: url, env })">
+                <span class="merge-action-icon">📋</span>
+                <span>复制</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <h3 v-if="hasMergeLinks">合并链接</h3>
-
-  <div class="project-card" v-if="hasMergeLinks" v>
-    <div class="info-item" v-for="[env, url] in Object.entries(mergeLinks)" :key="env" v-if="url">
-      <span class="info-label">{{ mergeLinksLabel[env] }}</span>
-      <span class="info-value">
-        <a :href="url" :alt="url" class="link-btn">
-          <span class="icon">🔗</span>
-          访问
-        </a>
-        <a href="#self" @click="vsPostMsg({ command: 'copyLink', content: url, env })" class="link-btn">
-          <span class="icon">📋</span>
-          复制
-        </a>
-      </span>
-    </div>
-  </div>
-
-  <button class="btn" :class="{'loading': loading.test}" @click="vsPostMsg({ command: 'publishToTest' })">
-    <span class="icon">🚀</span> 发布测试站
-  </button>
-  <button class="btn" :class="{'loading': loading.cn}" @click="vsPostMsg({ command: 'publishToCn' })">
-    <span class="icon">🌐</span> 发布国内站
-  </button>
-  <button class="btn" :class="{'loading': loading.prod}" @click="vsPostMsg({ command: 'publishToProd' })">
-    <span class="icon">🌍</span> 发布COM站
-  </button>
-  <button class="btn" @click="vsPostMsg({ command: 'getProdAndCnInfo' })">
-    <span class="icon">📋</span> 复制线上合并
-  </button>
+  <!-- 项目链接 -->
+  <footer class="app-footer" v-if="state.projectInfo.web_url">
+    <a :href="state.projectInfo.web_url" class="footer-link" target="_blank">
+      <span class="footer-link-icon">📂</span>
+      <span>在 GitLab 中查看项目</span>
+    </a>
+  </footer>
 </div>
