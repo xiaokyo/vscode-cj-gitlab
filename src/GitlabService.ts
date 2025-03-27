@@ -20,6 +20,18 @@ export class GitlabService {
     this.token = config.get("token") || "";
   }
 
+  isNotConfig() {
+    return !this.baseUrl || !this.token;
+  }
+
+  getBaseUrl() {
+    return this.baseUrl;
+  }
+
+  getToken() {
+    return this.token;
+  }
+
   private async execCommand(command: string): Promise<string> {
     try {
       const { stdout } = await execAsync(command, {

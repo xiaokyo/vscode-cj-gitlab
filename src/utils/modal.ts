@@ -19,15 +19,15 @@ export default class Modal {
 export class Toast {
   constructor() {}
 
-  static error(message: string) {
-    vscode.window.showErrorMessage(message);
+  static error(message: string, ...items: string[]) {
+    return vscode.window.showErrorMessage(message, ...items);
   }
 
-  static warning(message: string) {
-    vscode.window.showWarningMessage(message);
+  static warning(message: string, ...items: string[]) {
+    return vscode.window.showWarningMessage(message, ...items);
   }
 
-  static info(message: string) {
-    vscode.window.showInformationMessage(message);
+  static info(message: string, ...items: string[]) {
+    return vscode.window.showInformationMessage(message, ...items);
   }
 }

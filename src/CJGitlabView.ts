@@ -183,7 +183,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         case "openFile":
           try {
             const filePath = vscode.Uri.file(
-              path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || "", data.content)
+              path.join(
+                vscode.workspace.workspaceFolders?.[0].uri.fsPath || "",
+                data.content
+              )
             );
             vscode.window.showTextDocument(filePath);
           } catch (error: any) {
@@ -245,7 +248,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
     const projectInfo = await this._gitlabService.getProjectInfo();
     const currentBranch = await this._gitlabService.getCurrentBranch();
-    await this._gitlabService.getTestBranch();
+    await this._gitlabService.getTestBranch().catch((err) => {});
 
     if (!projectInfo.id) {
       this._view.webview.html = `
