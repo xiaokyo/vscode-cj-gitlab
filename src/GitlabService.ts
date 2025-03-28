@@ -5,6 +5,7 @@ import { Project } from "./types/Project";
 import { MergeResponse } from "./types/MergeRequest";
 import { Branch } from "./types/Branch";
 import { MergeRequestN } from "./types/mergeRequestN";
+import Modal from "./utils/modal";
 
 const execAsync = promisify(exec);
 
@@ -242,10 +243,12 @@ export class GitlabService {
     }
 
     if (!userForce) {
-      const isApply = await vscode.window.showQuickPick(["yes", "no"], {
-        placeHolder: `是否将${currentBranch}合并到${targetBranch}?`,
-      });
-      if (isApply !== "yes") {
+      const isApply = await Modal.info(
+        `是否将${currentBranch}合并到${targetBranch}?`,
+        { modal: true },
+        "Confirm",
+      );
+      if (isApply !== "Confirm") {
         throw new Error("用户取消合并");
       }
     }

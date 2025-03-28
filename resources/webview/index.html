@@ -57,7 +57,7 @@
       </div>
     </button>
 
-    <button class="quick-action-btn" :class="{'loading': loading.prod}" 
+    <button class="quick-action-btn" :class="{'loading': loading.prod || loading.cn}" 
       @click="vsPostMsg({ command: 'getProdAndCnInfo' })">
       <span class="quick-action-icon">📋</span>
       <div class="quick-action-content">

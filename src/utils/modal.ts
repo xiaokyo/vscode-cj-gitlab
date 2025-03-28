@@ -3,16 +3,40 @@ import * as vscode from "vscode";
 export default class Modal {
   constructor() {}
 
-  static error(message: string) {
-    vscode.window.showErrorMessage(message, { modal: true });
+  static error(
+    message: string,
+    options: vscode.MessageOptions = {},
+    ...items: string[]
+  ) {
+    return vscode.window.showErrorMessage(
+      message,
+      { modal: true, ...options },
+      ...items
+    );
   }
 
-  static warning(message: string) {
-    vscode.window.showWarningMessage(message, { modal: true });
+  static warning(
+    message: string,
+    options: vscode.MessageOptions = {},
+    ...items: string[]
+  ) {
+    return vscode.window.showWarningMessage(
+      message,
+      { modal: true, ...options },
+      ...items
+    );
   }
 
-  static info(message: string) {
-    vscode.window.showInformationMessage(message, { modal: true });
+  static info(
+    message: string,
+    options: vscode.MessageOptions = {},
+    ...items: string[]
+  ) {
+    return vscode.window.showInformationMessage(
+      message,
+      { modal: true, ...options },
+      ...items
+    );
   }
 }
 
