@@ -8,6 +8,13 @@
 - 复制合并链接带上项目的信息。例：项目名称、最后一条commit信息、合并环境
 - 简化发布流程，提高工作效率
 
+## 安装
+
+点击下面链接安装
+https://marketplace.cursorapi.com/items?itemName=xiaokyo.cj-gitlab
+
+或者在vscode的插件市场中搜索````CJ GitLab````
+
 ## 使用方法
 
 在 vscode 配置如下
