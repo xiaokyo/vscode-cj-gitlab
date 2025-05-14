@@ -33,7 +33,7 @@ export default class StatusBar {
             .getTestBranch()
             .then((testBranch) => {
               this.setText(
-                `【${projectInfo.name}】${branch} merge ${testBranch}`
+                `${branch} merge ${testBranch}`
               );
               this.show();
             });
