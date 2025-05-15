@@ -33,7 +33,8 @@ export default class StatusBar {
             .getTestBranch()
             .then((testBranch) => {
               this.setText(
-                `${branch} merge ${testBranch}`
+                `$(git-merge)`,
+                `Merge ${branch} into ${testBranch}`
               );
               this.show();
             });
