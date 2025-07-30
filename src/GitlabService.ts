@@ -124,7 +124,9 @@ export class GitlabService {
       return isMerged;
     } catch (err: any) {
       if (err.message.includes("Command failed: git fetch")) {
-        throw new Error(`目标分支${targetBranch}不存在`);
+        throw new Error(
+          `目标分支${targetBranch}不存在, 或无法访问, 或有本地内容没有上传到远程仓库`
+        );
       }
       throw new Error(`检查分支合并状态失败: ${err.message}`);
     }
@@ -246,7 +248,7 @@ export class GitlabService {
       const isApply = await Modal.info(
         `是否将${currentBranch}合并到${targetBranch}?`,
         { modal: true },
-        "Confirm",
+        "Confirm"
       );
       if (isApply !== "Confirm") {
         throw new Error("用户取消合并");
