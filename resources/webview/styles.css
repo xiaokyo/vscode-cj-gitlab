@@ -48,6 +48,13 @@ body {
   border-radius: 16px;
   font-size: 12px;
   font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.branch-badge:hover {
+  background: var(--vscode-button-hoverBackground);
+  opacity: 0.8;
 }
 
 .project-description {
@@ -301,6 +308,8 @@ body {
 .app-footer {
   border-top: 1px solid var(--vscode-widget-border);
   text-align: center;
+  display: flex;
+  flex-direction: column;
 }
 
 .footer-link {

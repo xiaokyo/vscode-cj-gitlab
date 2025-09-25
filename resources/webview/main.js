@@ -55,6 +55,14 @@ new Vue({
       vscode.postMessage(data);
     },
 
+    /** 复制分支名 */
+    copyBranch() {
+      this.vsPostMsg({ 
+        command: 'copyBranch', 
+        content: this.state.currentBranch 
+      });
+    },
+
     /** 处理文件名显示 */
     formatFileName(file) {
       // 处理 index 文件的情况

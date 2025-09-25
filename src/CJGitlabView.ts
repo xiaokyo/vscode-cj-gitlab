@@ -171,6 +171,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           vscode.env.clipboard.writeText(data.content);
           Toast.info(`${data.content}, 已复制到剪贴板`);
           break;
+        case "copyBranch":
+          vscode.env.clipboard.writeText(data.content);
+          Toast.info(`分支名 "${data.content}" 已复制到剪贴板`);
+          break;
         case "publishToProd":
           this.publishToProd();
           break;
