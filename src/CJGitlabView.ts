@@ -276,10 +276,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     try {
       console.log('Starting pipeline and tag status update...');
       const projectInfo = await this._gitlabService.getProjectInfo();
-      const currentBranch = await this._gitlabService.getCurrentBranch();
-      
-      console.log('Project info:', { id: projectInfo.id, name: projectInfo.name });
-      console.log('Current branch:', currentBranch);
+      // const currentBranch = await this._gitlabService.getCurrentBranch();
       
       if (!projectInfo.id) {
         console.log('Pipeline and tag update skipped: No project ID');
@@ -287,15 +284,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       }
 
       // 获取最新的pipeline状态
-      console.log('Calling getLatestPipeline with projectId:', projectInfo.id, 'branch:', currentBranch);
       const latestPipeline = await this._gitlabService.getLatestPipeline(projectInfo.id);
       
       // 获取最新的tag
-      console.log('Calling getLatestTag with projectId:', projectInfo.id);
       const latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
-      
-      console.log('Latest pipeline result:', latestPipeline);
-      console.log('Latest tag result:', latestTag);
       
       // 发送pipeline状态更新
       this._view.webview.postMessage({ 
