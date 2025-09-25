@@ -5,6 +5,8 @@ import { Project } from "./types/Project";
 import { MergeResponse } from "./types/MergeRequest";
 import { Branch } from "./types/Branch";
 import { MergeRequestN } from "./types/mergeRequestN";
+import { Pipeline } from "./types/Pipeline";
+import { Tag } from "./types/Tag";
 import Modal from "./utils/modal";
 
 const execAsync = promisify(exec);
@@ -360,5 +362,92 @@ export class GitlabService {
       (name) => Boolean(name) && name !== "undefined"
     );
     return noCommitFiles;
+  }
+
+  async getPipelines(projectId: number, ref?: string): Promise<Pipeline[]> {
+    let apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/pipelines?private_token=${this.token}&per_page=10&sort=desc`;
+    if (ref) {
+      // URL编码分支名称，处理特殊字符如 '/'
+      const encodedRef = encodeURIComponent(ref);
+      apiUrl += `&ref=${encodedRef}`;
+    }
+    
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Pipeline API Error Response:', errorText);
+      throw new Error(`获取pipelines失败: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data as Pipeline[];
+  }
+
+  async getLatestPipeline(projectId: number, ref?: string): Promise<Pipeline | null> {
+    try {
+      
+      // 验证输入参数
+      if (!projectId) {
+        return null;
+      }
+      
+      if (!this.baseUrl || !this.token) {
+        return null;
+      }
+      
+      const pipelines = await this.getPipelines(projectId, ref);
+      return pipelines.length > 0 ? pipelines[0] : null;
+    } catch (error) {
+      console.error('获取最新pipeline失败:', error);
+      return null;
+    }
+  }
+
+  async getTags(projectId: number): Promise<Tag[]> {
+    const apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/repository/tags?private_token=${this.token}&per_page=10&sort=desc`;    
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log('Tags API Response Status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Tags API Error Response:', errorText);
+      throw new Error(`获取tags失败: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data as Tag[];
+  }
+
+  async getLatestTag(projectId: number): Promise<Tag | null> {
+    try {
+
+      if (!projectId) {
+        console.error('Project ID is missing or invalid:', projectId);
+        return null;
+      }
+      
+      if (!this.baseUrl || !this.token) {
+        console.error('GitLab configuration is missing. BaseURL:', this.baseUrl, 'Token:', this.token ? '[SET]' : '[NOT SET]');
+        return null;
+      }
+      
+      const tags = await this.getTags(projectId);
+      return tags.length > 0 ? tags[0] : null;
+    } catch (error) {
+      console.error('获取最新tag失败:', error);
+      return null;
+    }
   }
 }

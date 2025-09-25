@@ -11,7 +11,7 @@
   </header>
 
   <!-- 未提交文件警告 -->
-  <div v-if="state.stashFiles.length > 0" class="notification notification-warning">
+  <!-- <div v-if="state.stashFiles.length > 0" class="notification notification-warning">
     <div class="notification-header">
       <span class="notification-icon">⚠️</span>
       <h3>未提交更改</h3>
@@ -26,49 +26,39 @@
         </div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- 快捷操作区 -->
   <div class="quick-actions">
     <button class="quick-action-btn primary" :class="{'loading': loading.test}"
-      @click="vsPostMsg({ command: 'publishToTest' })">
+      @click="vsPostMsg({ command: 'publishToTest' })" title="发布到测试环境">
       <span class="quick-action-icon">🚀</span>
-      <div class="quick-action-content">
-        <span class="quick-action-title">发布测试站</span>
-        <span class="quick-action-desc">部署到测试环境</span>
-      </div>
+      <span class="quick-action-title">TEST</span>
     </button>
 
-    <button class="quick-action-btn" :class="{'loading': loading.cn}" @click="vsPostMsg({ command: 'publishToCn' })">
+    <button class="quick-action-btn" :class="{'loading': loading.cn}" 
+      @click="vsPostMsg({ command: 'publishToCn' })" title="发布到国内生产环境">
       <span class="quick-action-icon">🌐</span>
-      <div class="quick-action-content">
-        <span class="quick-action-title">发布国内站</span>
-        <span class="quick-action-desc">部署到国内生产环境</span>
-      </div>
+      <span class="quick-action-title">CN</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod}"
-      @click="vsPostMsg({ command: 'publishToProd' })">
+      @click="vsPostMsg({ command: 'publishToProd' })" title="发布到国际生产环境">
       <span class="quick-action-icon">🌍</span>
-      <div class="quick-action-content">
-        <span class="quick-action-title">发布COM站</span>
-        <span class="quick-action-desc">部署到国际生产环境</span>
-      </div>
+      <span class="quick-action-title">COM</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod || loading.cn}"
-      @click="vsPostMsg({ command: 'getProdAndCnInfo' })">
+      @click="vsPostMsg({ command: 'getProdAndCnInfo' })" title="复制所有合并请求链接">
       <span class="quick-action-icon">📋</span>
-      <div class="quick-action-content">
-        <span class="quick-action-title">复制所有</span>
-        <span class="quick-action-desc">复制所有合并请求链接</span>
-      </div>
+      <span class="quick-action-title">ALL</span>
+    </button>
   </div>
 
   <!-- 合并链接面板 -->
   <div class="panel" v-if="hasMergeLinks">
     <div class="panel-header">
-      <h2>合并请求</h2>
+      <h2>Merge Requests</h2>
     </div>
     <div class="panel-content">
       <div class="merge-request-list">
@@ -78,11 +68,11 @@
             <div class="merge-request-actions">
               <a :href="url" class="merge-action-link" target="_blank">
                 <span class="merge-action-icon">🔗</span>
-                <span>查看</span>
+                <span>View</span>
               </a>
               <button class="merge-action-btn" @click="vsPostMsg({ command: 'copyLink', content: url, env })">
                 <span class="merge-action-icon">📋</span>
-                <span>复制</span>
+                <span>Copy</span>
               </button>
             </div>
           </div>
@@ -91,11 +81,55 @@
     </div>
   </div>
 
+  <!-- Tag 状态 -->
+  <div class="tag-status" v-if="tagInfo">
+    <div class="tag-status-header">
+      <span class="tag-status-icon">🏷️</span>
+      <span class="tag-status-title">Latest Tag</span>
+    </div>
+    <div class="tag-status-content">
+      <div class="tag-item">
+        <span class="tag-name">{{ tagInfo.name }}</span>
+        <span class="tag-commit">{{ tagInfo.commit.short_id }}</span>
+        <a :href="state.projectInfo.web_url + '/tags/' + tagInfo.name" class="tag-link" target="_blank" title="查看Tag详情">
+          <span class="tag-link-icon">🔗</span>
+        </a>
+      </div>
+      <div class="tag-meta" v-if="tagInfo.commit.committed_date">
+        <span class="tag-time">{{ formatPipelineTime(tagInfo.commit.committed_date) }}</span>
+        <span class="tag-message" v-if="tagInfo.message">{{ tagInfo.message }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline 状态 -->
+  <div class="pipeline-status" v-if="pipelineInfo">
+    <div class="pipeline-status-header">
+      <span class="pipeline-status-icon">⚙️</span>
+      <span class="pipeline-status-title">Pipeline Status</span>
+    </div>
+    <div class="pipeline-status-content">
+      <div class="pipeline-item">
+        <span class="pipeline-branch">{{ pipelineInfo.ref }}</span>
+        <span class="pipeline-status-badge" :class="'status-' + pipelineInfo.status">
+          {{ pipelineInfo.status }}
+        </span>
+        <a :href="pipelineInfo.web_url" class="pipeline-link" target="_blank" title="查看Pipeline详情">
+          <span class="pipeline-link-icon">🔗</span>
+        </a>
+      </div>
+      <div class="pipeline-meta" v-if="pipelineInfo.started_at">
+        <span class="pipeline-time">{{ formatPipelineTime(pipelineInfo.started_at) }}</span>
+        <span class="pipeline-duration" v-if="pipelineInfo.duration">{{ formatDuration(pipelineInfo.duration) }}</span>
+      </div>
+    </div>
+  </div>
+
   <!-- 项目链接 -->
   <footer class="app-footer" v-if="state.projectInfo.web_url">
     <a :href="state.projectInfo.web_url" class="footer-link" target="_blank">
       <span class="footer-link-icon">🏠</span>
-      <span>在 GitLab 中查看项目</span>
+      <span>View Gitlab</span>
     </a>
 
     <a :href="state.projectInfo.web_url + '/pipelines'" class="footer-link" target="_blank">

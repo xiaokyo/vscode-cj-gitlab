@@ -27,6 +27,8 @@ new Vue({
 
     return {
       state: __INITIAL_DATA__,
+      pipelineInfo: __INITIAL_DATA__.latestPipeline,
+      tagInfo: __INITIAL_DATA__.latestTag,
       mergeLinks: {
         test: "",
         cn: "",
@@ -77,6 +79,37 @@ new Vue({
       return file.split("/").pop() || '';
     },
 
+    /** 格式化Pipeline时间 */
+    formatPipelineTime(timeString) {
+      if (!timeString) {
+        return '';
+      }
+      const date = new Date(timeString);
+      const now = new Date();
+      const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+      
+      if (diffInMinutes < 1) {
+        return '刚刚';
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes}分钟前`;
+      } else if (diffInMinutes < 1440) {
+        const hours = Math.floor(diffInMinutes / 60);
+        return `${hours}小时前`;
+      } else {
+        return date.toLocaleDateString();
+      }
+    },
+
+    /** 格式化Pipeline持续时间 */
+    formatDuration(seconds) {
+      if (!seconds) {
+        return '';
+      }
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    },
+
     /** listener link */
     listenerLinkChange() {
       window.addEventListener("message", ({ data }) => {
@@ -86,6 +119,12 @@ new Vue({
             break;
           case "merge_link":
             this.mergeLinks[data.env] = data.link;
+            break;
+          case "pipeline_status":
+            this.pipelineInfo = data.pipeline;
+            break;
+          case "tag_status":
+            this.tagInfo = data.tag;
             break;
           default:
             break;

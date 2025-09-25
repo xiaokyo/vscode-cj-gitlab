@@ -23,6 +23,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private _gitlabService: GitlabService;
   private debouncedUpdateContent: () => void;
   private _gitWatch: GitWatch;
+  private _pipelineTimer?: NodeJS.Timeout;
+  private _pipelineInitialTimer?: NodeJS.Timeout;
   constructor(
     extensionUri: vscode.Uri,
     gitlabService: GitlabService,
@@ -204,12 +206,21 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.debouncedUpdateContent();
+        this.startPipelineTimer();
+      } else {
+        this.stopPipelineTimer();
       }
+    });
+
+    // Listen for dispose event to clean up timer
+    webviewView.onDidDispose(() => {
+      this.stopPipelineTimer();
     });
 
     this._gitWatch.add(this.debouncedUpdateContent.bind(this));
 
     await this.updateContent();
+    this.startPipelineTimer();
   }
 
   private setLoading(loading: boolean, env: "test" | "cn" | "prod" = "test") {
@@ -228,6 +239,78 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
     this._view.webview.postMessage({ type: "merge_link", link, env });
+  }
+
+  private startPipelineTimer() {
+    this.stopPipelineTimer(); // 确保不会有重复的定时器
+    
+    // 稍微延迟一下再开始定时更新，避免与初始加载重复
+    // 第一次延迟2秒，然后每5秒更新一次
+    this._pipelineInitialTimer = setTimeout(async () => {
+      await this.updatePipelineAndTagStatus();
+      
+      // 设置定时器，每5秒更新一次
+      this._pipelineTimer = setInterval(async () => {
+        await this.updatePipelineAndTagStatus();
+      }, 5000);
+    }, 2000);
+  }
+
+  private stopPipelineTimer() {
+    if (this._pipelineTimer) {
+      clearInterval(this._pipelineTimer);
+      this._pipelineTimer = undefined;
+    }
+    if (this._pipelineInitialTimer) {
+      clearTimeout(this._pipelineInitialTimer);
+      this._pipelineInitialTimer = undefined;
+    }
+  }
+
+  private async updatePipelineAndTagStatus() {
+    if (!this._view) {
+      console.log('Pipeline and tag update skipped: No view available');
+      return;
+    }
+    
+    try {
+      console.log('Starting pipeline and tag status update...');
+      const projectInfo = await this._gitlabService.getProjectInfo();
+      const currentBranch = await this._gitlabService.getCurrentBranch();
+      
+      console.log('Project info:', { id: projectInfo.id, name: projectInfo.name });
+      console.log('Current branch:', currentBranch);
+      
+      if (!projectInfo.id) {
+        console.log('Pipeline and tag update skipped: No project ID');
+        return;
+      }
+
+      // 获取最新的pipeline状态
+      console.log('Calling getLatestPipeline with projectId:', projectInfo.id, 'branch:', currentBranch);
+      const latestPipeline = await this._gitlabService.getLatestPipeline(projectInfo.id);
+      
+      // 获取最新的tag
+      console.log('Calling getLatestTag with projectId:', projectInfo.id);
+      const latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
+      
+      console.log('Latest pipeline result:', latestPipeline);
+      console.log('Latest tag result:', latestTag);
+      
+      // 发送pipeline状态更新
+      this._view.webview.postMessage({ 
+        type: "pipeline_status", 
+        pipeline: latestPipeline 
+      });
+
+      // 发送tag状态更新
+      this._view.webview.postMessage({ 
+        type: "tag_status", 
+        tag: latestTag 
+      });
+    } catch (error) {
+      console.error('更新pipeline和tag状态失败:', error);
+    }
   }
 
   private getScriptUris() {
@@ -279,10 +362,22 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
     const stashFiles = await this._gitlabService.getNoCommitFiles();
 
+    // 获取初始的pipeline和tag状态
+    let latestPipeline = null;
+    let latestTag = null;
+    try {
+      latestPipeline = await this._gitlabService.getLatestPipeline(projectInfo.id);
+      latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
+    } catch (error) {
+      console.error('获取初始pipeline和tag状态失败:', error);
+    }
+
     const __INITIAL_STATE__ = {
       projectInfo,
       currentBranch,
       stashFiles,
+      latestPipeline,
+      latestTag,
     };
 
     const indexTemplate = fs.readFileSync(

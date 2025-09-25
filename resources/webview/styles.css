@@ -149,22 +149,26 @@ body {
 /* 快捷操作区 */
 .quick-actions {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
   margin-bottom: 20px;
 }
 
 .quick-action-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   cursor: pointer;
   transition: all 0.2s ease;
-  text-align: left;
+  text-align: center;
+  min-height: 64px;
 }
 
 .quick-action-btn:hover {
@@ -182,24 +186,35 @@ body {
 }
 
 .quick-action-icon {
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
 }
 
-.quick-action-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .quick-action-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.2;
 }
 
-.quick-action-desc {
-  font-size: 12px;
-  opacity: 0.8;
+/* 响应式设计 - 小屏幕时改为2列 */
+@media (max-width: 400px) {
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  
+  .quick-action-btn {
+    padding: 10px 6px;
+    min-height: 56px;
+  }
+  
+  .quick-action-icon {
+    font-size: 16px;
+  }
+  
+  .quick-action-title {
+    font-size: 11px;
+  }
 }
 
 /* 面板样式 */
@@ -356,4 +371,226 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Pipeline 状态样式 */
+.pipeline-status {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  padding: 16px 0;
+  margin-bottom: 10px;
+}
+
+.pipeline-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pipeline-status-icon {
+  font-size: 16px;
+}
+
+.pipeline-status-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.pipeline-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pipeline-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pipeline-branch {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 13px;
+  color: var(--vscode-textLink-foreground);
+  background: var(--vscode-textCodeBlock-background);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pipeline-status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-success {
+  background: #28a745;
+  color: white;
+}
+
+.status-failed {
+  background: #dc3545;
+  color: white;
+}
+
+.status-running {
+  background: #007bff;
+  color: white;
+}
+
+.status-pending {
+  background: #ffc107;
+  color: #212529;
+}
+
+.status-canceled {
+  background: #6c757d;
+  color: white;
+}
+
+.status-skipped {
+  background: #6c757d;
+  color: white;
+}
+
+.status-created,
+.status-waiting_for_resource,
+.status-preparing {
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.pipeline-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.pipeline-link:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.pipeline-link-icon {
+  font-size: 12px;
+}
+
+.pipeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.pipeline-time,
+.pipeline-duration {
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* Tag 状态样式 */
+.tag-status {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  padding: 16px 0;
+  margin-bottom: 0px;
+}
+
+.tag-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tag-status-icon {
+  font-size: 16px;
+}
+
+.tag-status-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.tag-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tag-name {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-textLink-foreground);
+  background: var(--vscode-textCodeBlock-background);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.tag-commit {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-textPreformat-background);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.tag-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.tag-link:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.tag-link-icon {
+  font-size: 12px;
+}
+
+.tag-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.tag-time {
+  font-family: var(--vscode-editor-font-family);
+}
+
+.tag-message {
+  font-style: italic;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
