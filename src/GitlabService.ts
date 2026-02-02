@@ -324,7 +324,7 @@ export class GitlabService {
       return "cn";
     }
     const branchs = await this.searchBranchs(projectId, "master-cn");
-    if (branchs.length > 0) {
+    if (branchs.length > 0 && branchs.some((branch) => branch.name === "master-cn")) {
       return "master-cn";
     }
 
