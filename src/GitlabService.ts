@@ -14,8 +14,9 @@ const execAsync = promisify(exec);
 export class GitlabService {
   private readonly baseUrl: string;
   private readonly token: string;
-  public testBranchName: string = "";
-  public projectInfo: Project | null = null;
+  public testBranchNames = new Map<string, string>();
+  public projectInfos = new Map<string, Project>();
+  private selectedWorkspaceRootPath: string | null = null;
 
   constructor() {
     const config = vscode.workspace.getConfiguration("cj-gitlab");
@@ -35,10 +36,104 @@ export class GitlabService {
     return this.token;
   }
 
+  private getCurrentWorkspaceFolder(): vscode.WorkspaceFolder {
+    if (this.selectedWorkspaceRootPath) {
+      const selectedFolder = vscode.workspace.workspaceFolders?.find(
+        (folder) => folder.uri.fsPath === this.selectedWorkspaceRootPath
+      );
+      if (selectedFolder) {
+        return selectedFolder;
+      }
+      this.selectedWorkspaceRootPath = null;
+    }
+
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    if (activeUri) {
+      const activeFolder = vscode.workspace.getWorkspaceFolder(activeUri);
+      if (activeFolder) {
+        return activeFolder;
+      }
+    }
+
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      return workspaceFolders[0];
+    }
+
+    throw new Error("未打开工作区");
+  }
+
+  private getCurrentWorkspaceKey(): string {
+    return this.getCurrentWorkspaceFolder().uri.fsPath;
+  }
+
+  public getCurrentWorkspaceRootPath(): string {
+    return this.getCurrentWorkspaceFolder().uri.fsPath;
+  }
+
+  public getCurrentWorkspaceName(): string {
+    return this.getCurrentWorkspaceFolder().name;
+  }
+
+  public setTargetProjectByWorkspaceFolder(
+    folder: vscode.WorkspaceFolder
+  ): boolean {
+    const nextPath = folder.uri.fsPath;
+    const changed = this.selectedWorkspaceRootPath !== nextPath;
+    this.selectedWorkspaceRootPath = nextPath;
+    return changed;
+  }
+
+  public syncTargetProjectWithActiveEditor(): boolean {
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    if (!activeUri) {
+      return false;
+    }
+
+    const activeFolder = vscode.workspace.getWorkspaceFolder(activeUri);
+    if (!activeFolder) {
+      return false;
+    }
+
+    return this.setTargetProjectByWorkspaceFolder(activeFolder);
+  }
+
+  public async selectTargetProject(): Promise<vscode.WorkspaceFolder | null> {
+    const workspaceFolders = vscode.workspace.workspaceFolders || [];
+    if (workspaceFolders.length === 0) {
+      throw new Error("未打开工作区");
+    }
+
+    if (workspaceFolders.length === 1) {
+      this.setTargetProjectByWorkspaceFolder(workspaceFolders[0]);
+      return workspaceFolders[0];
+    }
+
+    const quickPickItems = workspaceFolders.map((folder) => ({
+      label: folder.name,
+      description: folder.uri.fsPath,
+      folder,
+      picked: folder.uri.fsPath === this.getCurrentWorkspaceRootPath(),
+    }));
+
+    const selected = await vscode.window.showQuickPick(quickPickItems, {
+      title: "选择目标项目",
+      placeHolder: "请选择要执行 GitLab/Git 操作的工作区项目",
+      canPickMany: false,
+    });
+
+    if (!selected) {
+      return null;
+    }
+
+    this.setTargetProjectByWorkspaceFolder(selected.folder);
+    return selected.folder;
+  }
+
   private async execCommand(command: string): Promise<string> {
     try {
       const { stdout } = await execAsync(command, {
-        cwd: vscode.workspace.workspaceFolders?.[0].uri.fsPath,
+        cwd: this.getCurrentWorkspaceRootPath(),
       });
       return stdout.trim();
     } catch (error) {
@@ -49,8 +144,10 @@ export class GitlabService {
 
   async getProjectInfo(): Promise<Project> {
     try {
-      if (this.projectInfo?.id) {
-        return this.projectInfo;
+      const workspaceKey = this.getCurrentWorkspaceKey();
+      const cachedProjectInfo = this.projectInfos.get(workspaceKey);
+      if (cachedProjectInfo?.id) {
+        return cachedProjectInfo;
       }
       const projectName = await this.getCurrentProjectName();
       const res: Project[] = await this.getProjectsInfo(projectName);
@@ -61,7 +158,7 @@ export class GitlabService {
       if (!findProject) {
         throw new Error("未找到相关项目");
       }
-      this.projectInfo = findProject;
+      this.projectInfos.set(workspaceKey, findProject);
       return findProject;
     } catch (error) {
       console.error("获取项目信息失败:", error);
@@ -332,20 +429,22 @@ export class GitlabService {
   }
 
   async getTestBranch() {
+    const workspaceKey = this.getCurrentWorkspaceKey();
     const { id: projectId } = await this.getProjectInfo();
-    if (this.testBranchName) {
-      return this.testBranchName;
+    const cachedTestBranch = this.testBranchNames.get(workspaceKey);
+    if (cachedTestBranch) {
+      return cachedTestBranch;
     }
     let branchs = await this.searchBranchs(projectId, "release");
     const isHasRelease =
       branchs.length > 0 && branchs.some((branch) => branch.name === "release");
     if (isHasRelease) {
-      this.testBranchName = "master";
-      return this.testBranchName;
+      this.testBranchNames.set(workspaceKey, "master");
+      return "master";
     }
 
-    this.testBranchName = "dev";
-    return this.testBranchName;
+    this.testBranchNames.set(workspaceKey, "dev");
+    return "dev";
   }
 
   async checkStatusNoCommit() {

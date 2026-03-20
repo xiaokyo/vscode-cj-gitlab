@@ -47,6 +47,10 @@ export default class StatusBar {
       });
   }
 
+  public refresh() {
+    this.refreshBranch();
+  }
+
   public setText(text: string, tooltip: string | vscode.MarkdownString = "") {
     this._statusBarItem.text = `${text}`;
     this._statusBarItem.tooltip = tooltip || text;

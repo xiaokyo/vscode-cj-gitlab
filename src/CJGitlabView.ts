@@ -141,6 +141,20 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
+  public async refresh() {
+    await this.updateContent();
+    this.startPipelineTimer();
+  }
+
+  public async selectTargetProject() {
+    const selectedFolder = await this._gitlabService.selectTargetProject();
+    if (!selectedFolder) {
+      return;
+    }
+    await this.refresh();
+    Toast.info(`已切换目标项目: ${selectedFolder.name}`);
+  }
+
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -186,11 +200,25 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         case "publishToTest":
           this.publishToTest();
           break;
+        case "selectTargetProject":
+          try {
+            await this.selectTargetProject();
+          } catch (error: any) {
+            Toast.error(error.message || "切换目标项目失败");
+          }
+          break;
         case "openFile":
           try {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.find(
+              (folder) =>
+                folder.uri.fsPath === this._gitlabService.getCurrentWorkspaceRootPath()
+            );
+            if (workspaceFolder) {
+              this._gitlabService.setTargetProjectByWorkspaceFolder(workspaceFolder);
+            }
             const filePath = vscode.Uri.file(
               path.join(
-                vscode.workspace.workspaceFolders?.[0].uri.fsPath || "",
+                this._gitlabService.getCurrentWorkspaceRootPath(),
                 data.content
               )
             );
@@ -367,6 +395,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     const __INITIAL_STATE__ = {
       projectInfo,
       currentBranch,
+      currentWorkspaceName: this._gitlabService.getCurrentWorkspaceName(),
       stashFiles,
       latestPipeline,
       latestTag,

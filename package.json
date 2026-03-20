@@ -25,6 +25,10 @@
       {
         "command": "cj-gitlab.publishToTest",
         "title": "Publish to Test"
+      },
+      {
+        "command": "cj-gitlab.selectTargetProject",
+        "title": "Select Target Project"
       }
     ],
     "viewsContainers": {

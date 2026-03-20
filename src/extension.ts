@@ -42,6 +42,40 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cj-gitlab.selectTargetProject", async () => {
+      try {
+        await provider.selectTargetProject();
+        statusBar.refresh();
+      } catch (error: any) {
+        Toast.error(error.message || "切换目标项目失败");
+      }
+    })
+  );
+
+  const syncTargetProject = async () => {
+    const changed = gitlabService.syncTargetProjectWithActiveEditor();
+    if (!changed) {
+      return;
+    }
+    await provider.refresh();
+    statusBar.refresh();
+  };
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      void syncTargetProject();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void syncTargetProject();
+    })
+  );
+
+  void syncTargetProject();
+
   statusBar.setCommand("cj-gitlab.publishToTest");
 }
 

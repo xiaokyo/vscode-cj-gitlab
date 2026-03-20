@@ -5,6 +5,12 @@
       <h3>{{state.projectInfo.name}}</h3>
       <div class="branch-badge" @click="copyBranch" title="点击复制分支名">{{state.currentBranch}}</div>
     </div>
+    <div class="workspace-switch-row">
+      <span class="workspace-label">目标项目：{{state.currentWorkspaceName || '未选择'}}</span>
+      <button class="workspace-switch-btn" @click="vsPostMsg({ command: 'selectTargetProject' })">
+        切换项目
+      </button>
+    </div>
     <p v-if="state.projectInfo.description" class="project-description">
       {{state.projectInfo.description}}
     </p>

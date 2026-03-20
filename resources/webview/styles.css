@@ -64,6 +64,36 @@ body {
   line-height: 1.6;
 }
 
+.workspace-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 10px;
+}
+
+.workspace-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-switch-btn {
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workspace-switch-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
 /* 通知样式 */
 .notification {
   margin-bottom: 24px;
