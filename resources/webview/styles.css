@@ -7,6 +7,41 @@ body {
   background: var(--vscode-editor-background);
 }
 
+/* 全局 Loading 遮罩 */
+.global-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--vscode-editor-background);
+  opacity: 0.92;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 999;
+}
+
+.global-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--vscode-widget-border);
+  border-top-color: var(--vscode-focusBorder);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.global-loading-text {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
 .container {
   max-width: 900px;
   margin: 0 auto;
@@ -623,4 +658,263 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 多项目 Tab 栏 */
+.workspace-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.workspace-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  min-width: 80px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.workspace-tab:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.workspace-tab-active {
+  background: var(--vscode-editor-background);
+  border-color: var(--vscode-widget-border);
+  position: relative;
+}
+
+.workspace-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--vscode-editor-background);
+}
+
+.workspace-tab-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tab-branch {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 1px 6px;
+  border-radius: 8px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Active Merge Requests */
+.active-mr-panel {
+  margin-bottom: 16px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.active-mr-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.active-mr-icon {
+  font-size: 14px;
+}
+
+.active-mr-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.active-mr-count {
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.active-mr-list {
+  padding: 4px 0;
+}
+
+.active-mr-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.active-mr-item:last-child {
+  border-bottom: none;
+}
+
+.active-mr-title-link {
+  font-size: 13px;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.active-mr-title-link:hover {
+  text-decoration: underline;
+  color: var(--vscode-textLink-activeForeground);
+}
+
+.active-mr-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mr-copy-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.active-mr-item:hover .mr-copy-btn {
+  opacity: 0.7;
+}
+
+.mr-copy-btn:hover {
+  opacity: 1 !important;
+  background: var(--vscode-toolbar-hoverBackground);
+  border-color: var(--vscode-widget-border);
+}
+
+.active-mr-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.active-mr-branch {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+}
+
+.active-mr-author {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.active-mr-status-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.active-mr-conflict {
+  font-size: 10px;
+  color: #dc3545;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.mr-status-can_be_merged {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+
+.mr-status-cannot_be_merged {
+  background: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+.mr-status-unchecked {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.mr-status-checking {
+  background: rgba(0, 123, 255, 0.15);
+  color: #007bff;
+}
+
+/* Pipeline 关联 MR */
+.pipeline-mr-list {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--vscode-widget-border);
+}
+
+.pipeline-mr-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.pipeline-mr-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.pipeline-mr-link {
+  font-size: 12px;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.pipeline-mr-link:hover {
+  text-decoration: underline;
+}
+
+.pipeline-mr-target {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
 }

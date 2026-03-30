@@ -142,6 +142,51 @@ export class GitlabService {
     }
   }
 
+  /**
+   * 获取所有工作区项目的信息（名称、分支等），用于多项目 Tab 展示
+   */
+  async getAllWorkspaceProjectInfos(): Promise<
+    Array<{
+      name: string;
+      branch: string;
+      fsPath: string;
+      isActive: boolean;
+    }>
+  > {
+    const workspaceFolders = vscode.workspace.workspaceFolders || [];
+    const currentPath = this.getCurrentWorkspaceRootPath();
+    const results: Array<{
+      name: string;
+      branch: string;
+      fsPath: string;
+      isActive: boolean;
+    }> = [];
+
+    for (const folder of workspaceFolders) {
+      try {
+        const { stdout: branch } = await execAsync(
+          "git rev-parse --abbrev-ref HEAD",
+          { cwd: folder.uri.fsPath }
+        );
+        results.push({
+          name: folder.name,
+          branch: branch.trim(),
+          fsPath: folder.uri.fsPath,
+          isActive: folder.uri.fsPath === currentPath,
+        });
+      } catch {
+        results.push({
+          name: folder.name,
+          branch: "N/A",
+          fsPath: folder.uri.fsPath,
+          isActive: folder.uri.fsPath === currentPath,
+        });
+      }
+    }
+
+    return results;
+  }
+
   async getProjectInfo(): Promise<Project> {
     try {
       const workspaceKey = this.getCurrentWorkspaceKey();
@@ -295,6 +340,29 @@ export class GitlabService {
     }
     const mergeRequests = await response.json();
     return mergeRequests as MergeRequestN[];
+  }
+
+  /**
+   * 获取已合并到指定目标分支的最近 MR 列表
+   * 用于展示 Pipeline ref 对应的已合并 MR
+   */
+  async getMergedMergeRequests(
+    projectId: number,
+    targetBranch: string
+  ): Promise<MergeRequestN[]> {
+    const encodedBranch = encodeURIComponent(targetBranch);
+    const apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/merge_requests?private_token=${this.token}&state=merged&target_branch=${encodedBranch}&per_page=10&order_by=updated_at&sort=desc`;
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`获取已合并MR失败: ${response.statusText}`);
+    }
+    return (await response.json()) as MergeRequestN[];
   }
 
   async acceptMergeRequest(projectId: number, mergeRequestId: number) {

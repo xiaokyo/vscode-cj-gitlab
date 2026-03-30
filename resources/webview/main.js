@@ -29,6 +29,9 @@ new Vue({
       state: __INITIAL_DATA__,
       pipelineInfo: __INITIAL_DATA__.latestPipeline,
       tagInfo: __INITIAL_DATA__.latestTag,
+      activeMergeRequests: __INITIAL_DATA__.activeMergeRequests || [],
+      pipelineMergedMRs: __INITIAL_DATA__.pipelineMergedMRs || [],
+      tabSwitching: false,
       mergeLinks: {
         test: "",
         cn: "",
@@ -62,6 +65,18 @@ new Vue({
       this.vsPostMsg({ 
         command: 'copyBranch', 
         content: this.state.currentBranch 
+      });
+    },
+
+    /** 切换工作区项目 */
+    switchProject(tab) {
+      if (tab.isActive) {
+        return;
+      }
+      this.tabSwitching = true;
+      this.vsPostMsg({
+        command: 'switchProject',
+        fsPath: tab.fsPath,
       });
     },
 
@@ -110,6 +125,36 @@ new Vue({
       return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     },
 
+    /**
+     * 注意：复制 MR 信息到剪贴板，包含标题、分支、链接、提交人
+     * 需求来源：第8次提交（第7次补充）— MR都可复制对应的信息
+     */
+    copyMrInfo(mr) {
+      const lines = [
+        `标题: ${mr.title}`,
+        `分支: ${mr.source_branch} → ${mr.target_branch}`,
+        `链接: ${mr.web_url}`,
+      ];
+      if (mr.author) {
+        lines.push(`提交人: ${mr.author.name}`);
+      }
+      this.vsPostMsg({ command: 'copyText', content: lines.join('\n') });
+    },
+
+    /** 格式化 MR merge_status 为可读文本 */
+    formatMergeStatus(status) {
+      const statusMap = {
+        can_be_merged: '✅ 可合并',
+        cannot_be_merged: '❌ 不可合并',
+        cannot_be_merged_recheck: '❌ 不可合并',
+        unchecked: '⏳ 未检查',
+        checking: '🔄 检查中',
+        ci_must_pass: '⏳ CI待通过',
+        ci_still_running: '🔄 CI运行中',
+      };
+      return statusMap[status] || status;
+    },
+
     /** listener link */
     listenerLinkChange() {
       window.addEventListener("message", ({ data }) => {
@@ -125,6 +170,12 @@ new Vue({
             break;
           case "tag_status":
             this.tagInfo = data.tag;
+            break;
+          case "active_merge_requests":
+            this.activeMergeRequests = data.mergeRequests || [];
+            break;
+          case "pipeline_merged_mrs":
+            this.pipelineMergedMRs = data.mergeRequests || [];
             break;
           default:
             break;

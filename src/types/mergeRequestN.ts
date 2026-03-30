@@ -49,4 +49,5 @@ export interface MergeRequestN {
   web_url: string;
   time_stats: TimeStats;
   squash: boolean;
+  has_conflicts?: boolean;
 }

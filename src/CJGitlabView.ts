@@ -207,6 +207,19 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
             Toast.error(error.message || "切换目标项目失败");
           }
           break;
+        case "switchProject":
+          try {
+            const folder = vscode.workspace.workspaceFolders?.find(
+              (f) => f.uri.fsPath === data.fsPath
+            );
+            if (folder) {
+              this._gitlabService.setTargetProjectByWorkspaceFolder(folder);
+              await this.refresh();
+            }
+          } catch (error: any) {
+            Toast.error(error.message || "切换项目失败");
+          }
+          break;
         case "openFile":
           try {
             const workspaceFolder = vscode.workspace.workspaceFolders?.find(
@@ -316,6 +329,28 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       
       // 获取最新的tag
       const latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
+
+      // 获取活跃的merge requests
+      let activeMergeRequests: any[] = [];
+      try {
+        const allMRs = await this._gitlabService.getMergeRequests(projectInfo.id);
+        activeMergeRequests = allMRs.filter((mr) => mr.state === "opened");
+      } catch (e) {
+        console.error('获取活跃MR失败:', e);
+      }
+
+      // 获取已合并到 pipeline ref 的 MR
+      let pipelineMergedMRs: any[] = [];
+      if (latestPipeline?.ref) {
+        try {
+          pipelineMergedMRs = await this._gitlabService.getMergedMergeRequests(
+            projectInfo.id,
+            latestPipeline.ref
+          );
+        } catch (e) {
+          console.error('获取Pipeline已合并MR失败:', e);
+        }
+      }
       
       // 发送pipeline状态更新
       this._view.webview.postMessage({ 
@@ -327,6 +362,18 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       this._view.webview.postMessage({ 
         type: "tag_status", 
         tag: latestTag 
+      });
+
+      // 发送活跃MR更新
+      this._view.webview.postMessage({
+        type: "active_merge_requests",
+        mergeRequests: activeMergeRequests,
+      });
+
+      // 发送Pipeline已合并MR更新
+      this._view.webview.postMessage({
+        type: "pipeline_merged_mrs",
+        mergeRequests: pipelineMergedMRs,
       });
     } catch (error) {
       console.error('更新pipeline和tag状态失败:', error);
@@ -385,12 +432,26 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     // 获取初始的pipeline和tag状态
     let latestPipeline = null;
     let latestTag = null;
+    let activeMergeRequests: any[] = [];
+    let pipelineMergedMRs: any[] = [];
     try {
       latestPipeline = await this._gitlabService.getLatestPipeline(projectInfo.id);
       latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
+      const allMRs = await this._gitlabService.getMergeRequests(projectInfo.id);
+      activeMergeRequests = allMRs.filter((mr) => mr.state === "opened");
+      // 获取已合并到 pipeline ref 分支的 MR
+      if (latestPipeline?.ref) {
+        pipelineMergedMRs = await this._gitlabService.getMergedMergeRequests(
+          projectInfo.id,
+          latestPipeline.ref
+        );
+      }
     } catch (error) {
-      console.error('获取初始pipeline和tag状态失败:', error);
+      console.error('获取初始pipeline、tag和MR状态失败:', error);
     }
+
+    // 获取所有工作区项目列表（用于多项目Tab）
+    const workspaceTabs = await this._gitlabService.getAllWorkspaceProjectInfos();
 
     const __INITIAL_STATE__ = {
       projectInfo,
@@ -399,6 +460,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       stashFiles,
       latestPipeline,
       latestTag,
+      workspaceTabs,
+      activeMergeRequests,
+      pipelineMergedMRs,
     };
 
     const indexTemplate = fs.readFileSync(
