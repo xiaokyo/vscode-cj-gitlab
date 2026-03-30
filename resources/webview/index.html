@@ -123,6 +123,35 @@
     </div>
   </div>
 
+  <!-- 注意：Active Merge Requests 需独立展示且位于 Pipeline Status 上方，避免被误认为 Pipeline 子项 -->
+  <div class="active-mr-panel" v-if="activeMergeRequests && activeMergeRequests.length > 0">
+    <div class="active-mr-header">
+      <span class="active-mr-icon">🔀</span>
+      <span class="active-mr-title">Active Merge Requests</span>
+      <span class="active-mr-count">{{ activeMergeRequests.length }}</span>
+    </div>
+    <div class="active-mr-list">
+      <div class="active-mr-item" v-for="mr in activeMergeRequests" :key="mr.id">
+        <div class="active-mr-info">
+          <div class="active-mr-title-row">
+            <a :href="mr.web_url" class="active-mr-title-link" target="_blank" :title="mr.title">
+              {{ mr.title }}
+            </a>
+            <button class="mr-copy-btn" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
+          </div>
+          <div class="active-mr-meta">
+            <span class="active-mr-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</span>
+            <span class="active-mr-author" v-if="mr.author">{{ mr.author.name }}</span>
+            <span class="active-mr-status-badge" :class="'mr-status-' + mr.merge_status">
+              {{ formatMergeStatus(mr.merge_status) }}
+            </span>
+            <span class="active-mr-conflict" v-if="mr.has_conflicts">⚠️ 有冲突</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Pipeline 状态 -->
   <div class="pipeline-status" v-if="pipelineInfo">
     <div class="pipeline-status-header">
@@ -146,7 +175,7 @@
     </div>
   </div>
 
-  <!-- Pipeline 关联的已合并 Merge Requests（独立面板） -->
+  <!-- 注意：Pipeline Related MR 展示当前 Pipeline ref 对应的已合并 MR，且仅显示最新 2 条 -->
   <div class="active-mr-panel" v-if="pipelineMergedMRs.length > 0">
     <div class="active-mr-header">
       <span class="active-mr-icon">🔗</span>
@@ -166,35 +195,6 @@
             <span class="active-mr-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</span>
             <span class="active-mr-author" v-if="mr.author">{{ mr.author.name }}</span>
             <span class="active-mr-merged-at" v-if="mr.merged_at">{{ formatPipelineTime(mr.merged_at) }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Merge Requests（独立面板） -->
-  <div class="active-mr-panel" v-if="activeMergeRequests && activeMergeRequests.length > 0">
-    <div class="active-mr-header">
-      <span class="active-mr-icon">🔀</span>
-      <span class="active-mr-title">Active Merge Requests</span>
-      <span class="active-mr-count">{{ activeMergeRequests.length }}</span>
-    </div>
-    <div class="active-mr-list">
-      <div class="active-mr-item" v-for="mr in activeMergeRequests" :key="mr.id">
-        <div class="active-mr-info">
-          <div class="active-mr-title-row">
-            <a :href="mr.web_url" class="active-mr-title-link" target="_blank" :title="mr.title">
-              {{ mr.title }}
-            </a>
-            <button class="mr-copy-btn" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
-          </div>
-          <div class="active-mr-meta">
-            <span class="active-mr-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</span>
-            <span class="active-mr-author" v-if="mr.author">{{ mr.author.name }}</span>
-            <span class="active-mr-status-badge" :class="'mr-status-' + mr.merge_status">
-              {{ formatMergeStatus(mr.merge_status) }}
-            </span>
-            <span class="active-mr-conflict" v-if="mr.has_conflicts">⚠️ 有冲突</span>
           </div>
         </div>
       </div>

@@ -217,6 +217,32 @@
 
 🛑**26年03月30日 15:39:02 第9次提交（第8次补充）已完成**
 
+补充：
+- Active Merge Requests移动到pipeline status上面
+
+# 26年03月30日 15:58:59，第10次提交（第9次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 调整 Active Merge Requests 面板到 Pipeline Status 上方
+### 2. 修正 Pipeline Related MR 只展示前 2 条，保持与前序需求一致
+### 3. 编译验证本次界面调整
+### 4. 使用 askQuestions 工具收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - Active Merge Requests 面板顺序调整
+> 将 Active Merge Requests 独立面板移动到 Pipeline Status 面板之前展示，避免视觉上被理解为 Pipeline 的下级内容。
+
+> ### 📄任务2 - Pipeline Related MR 展示数量修正
+> 排查发现当前 `index.html` 实际使用的是 `pipelineMergedMRs.slice(0, 1)`，与第9次提交记录“展示前2条”不一致；现已修正为 `slice(0, 2)`，恢复展示最新 2 条关联 MR。
+
+> ### 📄任务3 - 构建验证
+> 执行 `npm run package`，`webpack --mode production --devtool hidden-source-map` 构建成功，无报错。
+
+**改动文件**：
+- `resources/webview/index.html` — 调整 Active MR 与 Pipeline Status 面板顺序；修正 Pipeline Related MR 数量限制
+
+🛑**26年03月30日 16:00:45 第10次提交（第9次补充）已完成**
+
 # 每次运行的结果插入到本段前面，以下为每次阅读时候都要确认没有遗忘的规则要求：
 
 1、每次文档更新需要遵循TDD开发模式及本文档`系统级要求`要求重新规划完成任务；2、规划最后一个任务必须是使用askQuestions工具Multi-select模式要求我补充需求（首选项：阅读 ${当前文档路径} 完成补充任务，如果用户选择此项表示用户在当前文档补充了新需求，需要按照要求重新读取文档内容，如果没有在尾部读取到新内容可能用户未保存，需重新调用askQuestions工具询问，Multi-select模式列出建议的后续任务），检查任务完整性不得跳过。3、允许直接操作本地的软件和git管理的代码，注意操作远程会有修改、删除数据效果并且不可撤销的操作必须先写入完整的操作方案，然后调用askQuestions工具Multi-select模式询问，确认后按照方案操作。4、当出现纠正的时候需要在修改的每个代码文件、方法前面按照规范写入注意事项注释说明，比如java代码需要遵循java doc注释规范，js代码需要遵循js doc注释规范；阅读代码时需要注意这些注释说明，理解修改的原因和目的；5、及时清理掉无用的文件，无用的日志文件，临时文件保存到tmp目录；6、注意检查保密、密钥等信息不要加入git管理，如果存在提示我需要删除；
