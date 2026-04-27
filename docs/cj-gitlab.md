@@ -243,6 +243,231 @@
 
 🛑**26年03月30日 16:00:45 第10次提交（第9次补充）已完成**
 
+补充：
+- 将当前选中的tab放到最前面展示，方便查看当前选中项目的tab信息
+- tab能在鼠标悬浮的时候展示全部吗，选择起来方便一点
+
+# 26年04月27日 14:13:51，第11次提交（第10次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 将当前选中的 workspace tab 排序到最前面展示
+### 2. 为 workspace tab 增加 hover 全量信息展示，便于区分同名项目/分支
+### 3. 执行构建验证本次改动
+### 4. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - 当前选中 Tab 置顶
+> 在 `main.js` 新增 `workspaceTabsOrdered` 计算属性，按 `isActive` 降序排列；`index.html` 的 Tab 列表改为 `v-for="tab in workspaceTabsOrdered"`，当前项目始终展示在最前。
+
+> ### 📄任务2 - Tab 悬浮展示完整信息
+> 在 `main.js` 新增 `getWorkspaceTabTitle(tab)`，返回“项目名 / 分支 / 路径”；`index.html` 使用 `:title="getWorkspaceTabTitle(tab)"`，鼠标悬浮可查看完整内容。
+
+> ### 📄任务3 - 构建验证
+> 两次执行 `npm run package` 均成功，`webpack` 编译通过，无报错。
+
+> ### 📄任务4 - 后续补充需求收集
+> 已使用 askQuestions（Multi-select）询问，选择结果为“阅读 `docs/cj-gitlab.md` 完成补充任务”；随后读取文档尾部并识别到新增的 Tab hover 展示需求，已在本次提交完成。
+
+**改动文件**：
+- `resources/webview/main.js` — 新增 `workspaceTabsOrdered`、`getWorkspaceTabTitle(tab)`
+- `resources/webview/index.html` — Tab 渲染改为有序列表并绑定完整 hover title
+
+🛑**26年04月27日 14:14:04 第11次提交（第10次补充）已完成**
+
+补充：
+- tab太多了，在左边展示tab的名称，不要在tab上展示分支了，然后tab从上往下排列
+
+# 26年04月27日 14:18:10，第12次提交（第11次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 将 workspace Tab 栏从顶部水平改为左侧垂直排列
+### 2. 移除 Tab 上的分支名显示，仅保留项目名称
+### 3. 执行构建验证
+### 4. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - Tab 栏改为左侧垂直布局
+> - `index.html`：将 `.workspace-tabs` 改为 `<aside>` 侧边栏，整个容器使用 flex 横向布局（`.has-sidebar`），右侧 `.workspace-main` 包裹原有所有内容
+> - `styles.css`：`.workspace-tabs` 改为 `flex-direction: column`、固定宽度 120px、`border-right` 分隔、`position: sticky` 置顶；`.workspace-main` 占满剩余空间
+> - 激活态改用 `list-activeSelectionBackground` 更贴合 VS Code 侧边栏风格
+
+> ### 📄任务2 - 移除 Tab 分支名
+> 从 `index.html` 移除 `<span class="workspace-tab-branch">`；从 `styles.css` 删除 `.workspace-tab-branch` 样式；hover tooltip（`getWorkspaceTabTitle`）仍保留分支信息。
+
+> ### 📄任务3 - 构建验证
+> `npm run package` 编译成功，无报错。
+
+**改动文件**：
+- `resources/webview/index.html` — Tab 改为 aside 侧边栏布局，移除分支 span，内容包裹在 `.workspace-main`
+- `resources/webview/styles.css` — Tab 栏垂直布局样式重写，删除 `.workspace-tab-branch`
+
+🛑**26年04月27日 14:18:34 第12次提交（第11次补充）已完成**
+
+补充：
+- UI重写，参考/Users/xiaokyo/Documents/works/cj-gitlab/docs/cj-gitlab-ui.png
+
+# 26年04月27日 14:25:00，第13次提交（第12次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 分析设计稿 cj-gitlab-ui.png，提取所有 UI 差异点
+### 2. 重写 index.html 模板匹配设计稿
+### 3. 重写 styles.css 全局样式
+### 4. 新增 main.js 辅助方法（getTabAbbr / formatTagDate）
+### 5. 构建验证
+### 6. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - 设计稿分析
+> 设计稿关键差异：
+> - 左侧 Tab 改为 40x40px 方块，显示项目首字母缩写（如 CC、MR、MF），激活态蓝色底白字
+> - 分支名改为绿色描边药丸 badge
+> - Tag 区域：绿底药丸标签名 + 复制按钮 + commit hash · 日期
+> - Pipeline Status：紧凑单行（分支 badge + 状态 badge + 链接）
+> - MR 面板：卡片式深色背景圆角，标题青色链接，底部 👤作者 🕐时间
+> - Footer：2x2 网格按钮（GitLab / Pipelines / Tags / Merge Requests）
+> - 整体更大圆角（10px）、更紧凑间距
+
+> ### 📄任务2 - HTML 模板重写
+> - Tab 栏：`<span class="workspace-tab-abbr">{{ getTabAbbr(tab.name) }}</span>`
+> - Tag：新增 `.tag-pill-row` + `.tag-pill` 绿色药丸 + 复制按钮 + `.tag-meta`（hash · date）
+> - Pipeline：改为 `.pipeline-row`（ref badge + status badge + link）一行展示
+> - MR：统一使用 `.mr-card` 卡片组件（title-row / branch / meta）
+> - Footer：改为 `.footer-btn` 2x2 网格
+
+> ### 📄任务3 - CSS 完全重写
+> 从 921 行缩减为 ~460 行，移除所有废弃样式，新增设计稿匹配的组件样式
+
+> ### 📄任务4 - JS 新增方法
+> - `getTabAbbr(name)`：按分隔符拆分取首字母或驼峰拆分，最多2字符
+> - `formatTagDate(dateString)`：格式化为 `YYYY/M/D`
+
+> ### 📄任务5 - 构建验证
+> `npm run package` 编译成功，webpack 无报错
+
+**改动文件**：
+- `resources/webview/index.html` — 全面重写模板结构
+- `resources/webview/styles.css` — 全面重写样式
+- `resources/webview/main.js` — 新增 `getTabAbbr`、`formatTagDate` 方法
+
+🛑**26年04月27日 14:40:05 第13次提交（第12次补充）已完成**
+
+补充：
+- tab悬浮秒出项目全称
+
+# 26年04月27日 14:41:00，第14次提交（第13次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. Tab 悬浮改用 CSS 自定义 tooltip 实现秒出项目全称
+### 2. 构建验证
+### 3. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - CSS 自定义 tooltip 实现秒出
+> **问题**：原生 `title` 属性 tooltip 有 0.5~1 秒浏览器延迟。
+> **方案**：移除 `:title` 绑定，改为在 Tab 内新增 `<span class="workspace-tab-tooltip">{{ tab.name }}</span>`，通过 CSS `display:none` + `.workspace-tab:hover .workspace-tab-tooltip { display:block }` 实现零延迟展示。tooltip 定位于 Tab 右侧（`left: calc(100% + 8px)`），使用 VS Code hover widget 配色。
+
+> ### 📄任务2 - 构建验证
+> `npm run package` 编译成功。
+
+**改动文件**：
+- `resources/webview/index.html` — 移除 `:title` 绑定，新增 `.workspace-tab-tooltip` 元素
+- `resources/webview/styles.css` — 新增 `.workspace-tab-tooltip` 样式（即时展示、右侧弹出）
+
+🛑**26年04月27日 14:43:10 第14次提交（第13次补充）已完成**
+
+补充：
+- tab的悬浮展示没出来，排查原因并修复
+
+# 26年04月27日 14:46:00，第15次提交（第14次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 排查 Tab 悬浮 tooltip 不显示的原因并修复
+### 2. 构建验证
+### 3. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - 排查并修复 Tab tooltip 不显示
+> **根因**：`.workspace-tabs` 容器设置了 `overflow-y: auto; overflow-x: hidden`，使用 `position: absolute` 的 tooltip 超出容器右边界后被 `overflow` 裁切不可见。
+> **修复**：改为全局固定定位方案：
+> - `index.html`：移除 Tab 内部 `.workspace-tab-tooltip`，改为在 `#app` 根级别新增一个全局 `.tab-tooltip` 元素（`v-if="tabTooltip.visible"`）
+> - Tab 上绑定 `@mouseenter="showTabTooltip($event, tab)"` 和 `@mouseleave="hideTabTooltip()"`
+> - `main.js`：新增 `tabTooltip` data（visible/text/top/left），`showTabTooltip` 用 `getBoundingClientRect()` 计算 Tab 右侧位置，`hideTabTooltip` 隐藏
+> - `styles.css`：`.tab-tooltip` 改为 `position: fixed`，脱离 overflow 上下文
+
+**改动文件**：
+- `resources/webview/index.html` — tooltip 改为全局固定元素
+- `resources/webview/main.js` — 新增 `tabTooltip` data、`showTabTooltip`、`hideTabTooltip`
+- `resources/webview/styles.css` — 删除旧 `.workspace-tab-tooltip`，新增 `.tab-tooltip` fixed 样式
+
+🛑**26年04月27日 14:51:09 第15次提交（第14次补充）已完成**
+
+补充：
+- 不用将当前选中的tab放在最前面了
+- 主题色用#f70
+
+# 26年04月27日 14:52:00，第16次提交（第15次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 移除 Tab 激活项置顶排序，恢复原始工作区顺序（纠正）
+### 2. 全局主题色替换为 #f70
+### 3. 构建验证
+### 4. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - 移除 Tab 置顶排序（纠正）
+> `index.html`：Tab 列表从 `v-for="tab in workspaceTabsOrdered"` 改回 `v-for="tab in state.workspaceTabs"`。
+> `main.js`：`workspaceTabsOrdered` computed 移除排序逻辑，直接返回原始数组。添加注释说明变更原因。
+
+> ### 📄任务2 - 主题色替换为 #f70
+> 全局替换 `#4ec9b0`（青绿）→ `#f70`（橙），`rgba(78, 201, 176, ...)` → `rgba(255, 119, 0, ...)`。
+> Tab 激活背景和 count badge 背景从 `var(--vscode-focusBorder)` 改为 `#f70`。
+> 影响范围：branch badge 颜色/边框、tag pill 背景/文字、MR 标题链接色、Tab active 背景、section count badge。
+
+> ### 📄任务3 - 构建验证
+> `npm run package` 编译成功。
+
+**改动文件**：
+- `resources/webview/index.html` — Tab 改回原始顺序
+- `resources/webview/main.js` — `workspaceTabsOrdered` 去除排序，添加纠正注释
+- `resources/webview/styles.css` — 全局主题色替换为 #f70
+
+🛑**26年04月27日 14:54:29 第16次提交（第15次补充）已完成**
+
+补充：
+- 全局主题色替换为：F9B2D7
+- 布局尽量紧凑一些
+
+# 26年04月27日 14:56:00，第17次提交（第16次补充）
+👨‍💻**提交人：小K**
+## 规划任务:
+### 1. 全局主题色替换为 #F9B2D7（纠正）
+### 2. 收紧全局布局间距
+### 3. 构建验证
+### 4. 使用 askQuestions 工具（Multi-select）收集后续补充需求
+
+## 任务处理结果:
+> ### 📄任务1 - 主题色替换为 #F9B2D7（纠正）
+> 全局替换 `#f70` → `#F9B2D7`，`rgba(255, 119, 0, ...)` → `rgba(249, 178, 215, ...)`。
+> 粉色背景上白色文字对比度不足，Tab active 和 count badge 的文字色从 `#fff` 改为 `#1e1e1e`（深色）。
+
+> ### 📄任务2 - 收紧布局间距
+> 主要缩减：
+> - 容器 padding: 20px → 12px，sidebar main: 20px → 12px 16px
+> - Tab 栏: 宽56→52px, gap 6→4px, Tab 方块 40→36px
+> - Header: mb 20→12px, pb 12→8px
+> - Quick actions: gap 8→6px, mb 16→10px, min-height 56→48px
+> - Section card: mb 12→8px, header padding 10px→8px, body padding 12px→8px
+> - MR card: padding 12→10px, gap 8→6px, title-row mb 6→4px
+> - Footer: gap 8→6px, mt/pt 16→10px
+
+> ### 📄任务3 - 构建验证
+> `npm run package` 编译成功。
+
+**改动文件**：
+- `resources/webview/styles.css` — 主题色替换为 #F9B2D7 + 文字对比度修复 + 全局间距收紧
+
+🛑**26年04月27日 15:00:01 第17次提交（第16次补充）已完成**
+
 # 每次运行的结果插入到本段前面，以下为每次阅读时候都要确认没有遗忘的规则要求：
 
 1、每次文档更新需要遵循TDD开发模式及本文档`系统级要求`要求重新规划完成任务；2、规划最后一个任务必须是使用askQuestions工具Multi-select模式要求我补充需求（首选项：阅读 ${当前文档路径} 完成补充任务，如果用户选择此项表示用户在当前文档补充了新需求，需要按照要求重新读取文档内容，如果没有在尾部读取到新内容可能用户未保存，需重新调用askQuestions工具询问，Multi-select模式列出建议的后续任务），检查任务完整性不得跳过。3、允许直接操作本地的软件和git管理的代码，注意操作远程会有修改、删除数据效果并且不可撤销的操作必须先写入完整的操作方案，然后调用askQuestions工具Multi-select模式询问，确认后按照方案操作。4、当出现纠正的时候需要在修改的每个代码文件、方法前面按照规范写入注意事项注释说明，比如java代码需要遵循java doc注释规范，js代码需要遵循js doc注释规范；阅读代码时需要注意这些注释说明，理解修改的原因和目的；5、及时清理掉无用的文件，无用的日志文件，临时文件保存到tmp目录；6、注意检查保密、密钥等信息不要加入git管理，如果存在提示我需要删除；

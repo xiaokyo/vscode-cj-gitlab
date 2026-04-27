@@ -32,6 +32,7 @@ new Vue({
       activeMergeRequests: __INITIAL_DATA__.activeMergeRequests || [],
       pipelineMergedMRs: __INITIAL_DATA__.pipelineMergedMRs || [],
       tabSwitching: false,
+      tabTooltip: { visible: false, text: '', top: 0, left: 0 },
       mergeLinks: {
         test: "",
         cn: "",
@@ -78,6 +79,56 @@ new Vue({
         command: 'switchProject',
         fsPath: tab.fsPath,
       });
+    },
+
+    /**
+     * 注意：显示 Tab tooltip，使用 fixed 定位避免被 .workspace-tabs 的 overflow 裁切
+     * 需求来源：第14次补充 — tab悬浮展示没出来的修复
+     */
+    showTabTooltip(event, tab) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      this.tabTooltip = {
+        visible: true,
+        text: tab.name,
+        top: rect.top + rect.height / 2,
+        left: rect.right + 8,
+      };
+    },
+
+    hideTabTooltip() {
+      this.tabTooltip.visible = false;
+    },
+
+    /** 悬浮展示 Tab 全量信息，避免名称/分支被截断导致难以区分 */
+    getWorkspaceTabTitle(tab) {
+      return `${tab.name}\n分支: ${tab.branch}\n路径: ${tab.fsPath}`;
+    },
+
+    /**
+     * 生成项目名的缩写用于 Tab 显示
+     * 规则：按 - _ . 空格 或驼峰拆分取首字母，最多2个字符
+     * 例：component-center → CC, my-frontend → MF
+     */
+    getTabAbbr(name) {
+      if (!name) return '??';
+      // 按分隔符拆分
+      const parts = name.split(/[-_. ]+/).filter(Boolean);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      // 尝试驼峰拆分
+      const camel = name.match(/[A-Z][a-z]*/g);
+      if (camel && camel.length >= 2) {
+        return (camel[0][0] + camel[1][0]).toUpperCase();
+      }
+      return name.slice(0, 2).toUpperCase();
+    },
+
+    /** 格式化 Tag 日期为 YYYY/M/D */
+    formatTagDate(dateString) {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
     },
 
     /** 处理文件名显示 */
@@ -187,6 +238,13 @@ new Vue({
   computed: {
     hasMergeLinks() {
       return this.mergeLinks.test || this.mergeLinks.cn || this.mergeLinks.prod;
+    },
+    /**
+     * 注意：不再需要将激活 Tab 置顶排序，保持原始工作区顺序
+     * 需求来源：第15次补充 — 不用将当前选中的tab放在最前面了
+     */
+    workspaceTabsOrdered() {
+      return this.state.workspaceTabs || [];
     },
   },
 });

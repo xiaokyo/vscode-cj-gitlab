@@ -1,24 +1,33 @@
-<div id="app" class="container">
+<div id="app" class="container" :class="{ 'has-sidebar': state.workspaceTabs && state.workspaceTabs.length > 1 }">
   <!-- Loading 遮罩 -->
   <div class="global-loading" v-if="tabSwitching">
     <div class="global-loading-spinner"></div>
     <span class="global-loading-text">切换项目中...</span>
   </div>
 
-  <!-- 多项目 Tab 栏 -->
-  <div class="workspace-tabs" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
+  <!-- 注意：Tab 栏为左侧垂直排列，显示项目缩写（第12次补充 UI 重写） -->
+  <!-- 注意：Tooltip 使用全局固定定位元素，避免被 .workspace-tabs 的 overflow 裁切（第14次补充修复） -->
+  <aside class="workspace-tabs" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
     <div
       class="workspace-tab"
       :class="{ 'workspace-tab-active': tab.isActive }"
       v-for="tab in state.workspaceTabs"
       :key="tab.fsPath"
       @click="switchProject(tab)"
-      :title="tab.fsPath"
+      @mouseenter="showTabTooltip($event, tab)"
+      @mouseleave="hideTabTooltip()"
     >
-      <span class="workspace-tab-name">{{ tab.name }}</span>
-      <span class="workspace-tab-branch">{{ tab.branch }}</span>
+      <span class="workspace-tab-abbr">{{ getTabAbbr(tab.name) }}</span>
     </div>
+  </aside>
+
+  <!-- Tab 全局 Tooltip -->
+  <div class="tab-tooltip" v-if="tabTooltip.visible" :style="{ top: tabTooltip.top + 'px', left: tabTooltip.left + 'px' }">
+    {{ tabTooltip.text }}
   </div>
+
+  <!-- 主内容区 -->
+  <div class="workspace-main">
 
   <!-- 项目信息头部 -->
   <header class="app-header">
@@ -30,24 +39,6 @@
       {{state.projectInfo.description}}
     </p>
   </header>
-
-  <!-- 未提交文件警告 -->
-  <!-- <div v-if="state.stashFiles.length > 0" class="notification notification-warning">
-    <div class="notification-header">
-      <span class="notification-icon">⚠️</span>
-      <h3>未提交更改</h3>
-    </div>
-    <div class="notification-content">
-      <div class="file-list">
-        <div class="file-item" v-for="file in state.stashFiles" :key="file"
-          @click="vsPostMsg({ command: 'openFile', content: file })">
-          <span class="file-item-icon">📄</span>
-          <span class="file-item-name">{{ formatFileName(file) }}</span>
-          <span class="file-item-action">查看 →</span>
-        </div>
-      </div>
-    </div>
-  </div> -->
 
   <!-- 快捷操作区 -->
   <div class="quick-actions">
@@ -102,100 +93,84 @@
     </div>
   </div>
 
-  <!-- Tag 状态 -->
-  <div class="tag-status" v-if="tagInfo">
-    <div class="tag-status-header">
-      <span class="tag-status-icon">🏷️</span>
-      <span class="tag-status-title">Latest Tag</span>
+  <!-- Latest Tag -->
+  <div class="section-card" v-if="tagInfo">
+    <div class="section-header">
+      <span class="section-icon">🏷️</span>
+      <span class="section-title">Latest Tag</span>
     </div>
-    <div class="tag-status-content">
-      <div class="tag-item">
-        <span class="tag-name">{{ tagInfo.name }}</span>
-        <span class="tag-commit">{{ tagInfo.commit.short_id }}</span>
-        <a :href="state.projectInfo.web_url + '/tags/' + tagInfo.name" class="tag-link" target="_blank" title="查看Tag详情">
-          <span class="tag-link-icon">🔗</span>
-        </a>
+    <div class="section-body">
+      <div class="tag-pill-row">
+        <span class="tag-pill">{{ tagInfo.name }}</span>
+        <button class="icon-btn" @click="vsPostMsg({ command: 'copyText', content: tagInfo.name })" title="复制Tag名称">📋</button>
       </div>
-      <div class="tag-meta" v-if="tagInfo.commit.committed_date">
-        <span class="tag-time">{{ formatPipelineTime(tagInfo.commit.committed_date) }}</span>
-        <span class="tag-message" v-if="tagInfo.message">{{ tagInfo.message }}</span>
+      <div class="tag-meta">
+        <span>{{ tagInfo.commit.short_id }}</span>
+        <span>·</span>
+        <span>{{ formatTagDate(tagInfo.commit.committed_date) }}</span>
       </div>
     </div>
   </div>
 
-  <!-- 注意：Active Merge Requests 需独立展示且位于 Pipeline Status 上方，避免被误认为 Pipeline 子项 -->
-  <div class="active-mr-panel" v-if="activeMergeRequests && activeMergeRequests.length > 0">
-    <div class="active-mr-header">
-      <span class="active-mr-icon">🔀</span>
-      <span class="active-mr-title">Active Merge Requests</span>
-      <span class="active-mr-count">{{ activeMergeRequests.length }}</span>
+  <!-- Pipeline Status -->
+  <div class="section-card" v-if="pipelineInfo">
+    <div class="section-header">
+      <span class="section-icon">⚙️</span>
+      <span class="section-title">Pipeline Status</span>
     </div>
-    <div class="active-mr-list">
-      <div class="active-mr-item" v-for="mr in activeMergeRequests" :key="mr.id">
-        <div class="active-mr-info">
-          <div class="active-mr-title-row">
-            <a :href="mr.web_url" class="active-mr-title-link" target="_blank" :title="mr.title">
-              {{ mr.title }}
-            </a>
-            <button class="mr-copy-btn" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
-          </div>
-          <div class="active-mr-meta">
-            <span class="active-mr-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</span>
-            <span class="active-mr-author" v-if="mr.author">{{ mr.author.name }}</span>
-            <span class="active-mr-status-badge" :class="'mr-status-' + mr.merge_status">
-              {{ formatMergeStatus(mr.merge_status) }}
-            </span>
-            <span class="active-mr-conflict" v-if="mr.has_conflicts">⚠️ 有冲突</span>
-          </div>
+    <div class="section-body">
+      <div class="pipeline-row">
+        <span class="pipeline-ref-badge">🔀 {{ pipelineInfo.ref }}</span>
+        <span class="pipeline-status-badge" :class="'status-' + pipelineInfo.status">
+          {{ pipelineInfo.status.toUpperCase() }}
+        </span>
+        <a :href="pipelineInfo.web_url" class="icon-btn-link" target="_blank" title="查看Pipeline详情">🔗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Related MRs (Pipeline 已合并 MR) -->
+  <div class="section-card" v-if="pipelineMergedMRs.length > 0">
+    <div class="section-header">
+      <span class="section-icon">🔀</span>
+      <span class="section-title">Related MRs</span>
+      <span class="section-count">{{ pipelineMergedMRs.length }}</span>
+    </div>
+    <div class="section-body mr-card-list">
+      <div class="mr-card" v-for="mr in pipelineMergedMRs.slice(0, 2)" :key="'pipeline-' + mr.id">
+        <div class="mr-card-title-row">
+          <a :href="mr.web_url" class="mr-card-title" target="_blank" :title="mr.title">{{ mr.title }}</a>
+          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
+        </div>
+        <div class="mr-card-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</div>
+        <div class="mr-card-meta">
+          <span v-if="mr.author">👤 {{ mr.author.name }}</span>
+          <span v-if="mr.merged_at">🕐 {{ formatPipelineTime(mr.merged_at) }}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Pipeline 状态 -->
-  <div class="pipeline-status" v-if="pipelineInfo">
-    <div class="pipeline-status-header">
-      <span class="pipeline-status-icon">⚙️</span>
-      <span class="pipeline-status-title">Pipeline Status</span>
+  <!-- Active Merge Requests -->
+  <div class="section-card" v-if="activeMergeRequests && activeMergeRequests.length > 0">
+    <div class="section-header">
+      <span class="section-icon">🔀</span>
+      <span class="section-title">Active Merge Requests</span>
+      <span class="section-count">{{ activeMergeRequests.length }}</span>
     </div>
-    <div class="pipeline-status-content">
-      <div class="pipeline-item">
-        <span class="pipeline-branch">{{ pipelineInfo.ref }}</span>
-        <span class="pipeline-status-badge" :class="'status-' + pipelineInfo.status">
-          {{ pipelineInfo.status }}
-        </span>
-        <a :href="pipelineInfo.web_url" class="pipeline-link" target="_blank" title="查看Pipeline详情">
-          <span class="pipeline-link-icon">🔗</span>
-        </a>
-      </div>
-      <div class="pipeline-meta" v-if="pipelineInfo.started_at">
-        <span class="pipeline-time">{{ formatPipelineTime(pipelineInfo.started_at) }}</span>
-        <span class="pipeline-duration" v-if="pipelineInfo.duration">{{ formatDuration(pipelineInfo.duration) }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 注意：Pipeline Related MR 展示当前 Pipeline ref 对应的已合并 MR，且仅显示最新 2 条 -->
-  <div class="active-mr-panel" v-if="pipelineMergedMRs.length > 0">
-    <div class="active-mr-header">
-      <span class="active-mr-icon">🔗</span>
-      <span class="active-mr-title">Pipeline Related MR</span>
-      <span class="active-mr-count">{{ pipelineMergedMRs.length }}</span>
-    </div>
-    <div class="active-mr-list">
-      <div class="active-mr-item" v-for="mr in pipelineMergedMRs.slice(0, 2)" :key="'pipeline-' + mr.id">
-        <div class="active-mr-info">
-          <div class="active-mr-title-row">
-            <a :href="mr.web_url" class="active-mr-title-link" target="_blank" :title="mr.title">
-              {{ mr.title }}
-            </a>
-            <button class="mr-copy-btn" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
-          </div>
-          <div class="active-mr-meta">
-            <span class="active-mr-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</span>
-            <span class="active-mr-author" v-if="mr.author">{{ mr.author.name }}</span>
-            <span class="active-mr-merged-at" v-if="mr.merged_at">{{ formatPipelineTime(mr.merged_at) }}</span>
-          </div>
+    <div class="section-body mr-card-list">
+      <div class="mr-card" v-for="mr in activeMergeRequests" :key="mr.id">
+        <div class="mr-card-title-row">
+          <a :href="mr.web_url" class="mr-card-title" target="_blank" :title="mr.title">{{ mr.title }}</a>
+          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
+        </div>
+        <div class="mr-card-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</div>
+        <div class="mr-card-meta">
+          <span v-if="mr.author">👤 {{ mr.author.name }}</span>
+          <span class="mr-card-status" :class="'mr-status-' + mr.merge_status">
+            {{ formatMergeStatus(mr.merge_status) }}
+          </span>
+          <span v-if="mr.has_conflicts" class="mr-card-conflict">⚠️ 有冲突</span>
         </div>
       </div>
     </div>
@@ -203,26 +178,23 @@
 
   <!-- 项目链接 -->
   <footer class="app-footer" v-if="state.projectInfo.web_url">
-    <a :href="state.projectInfo.web_url" class="footer-link" target="_blank">
-      <span class="footer-link-icon">🏠</span>
-      <span>View Gitlab</span>
+    <a :href="state.projectInfo.web_url" class="footer-btn" target="_blank">
+      <span class="footer-btn-icon">🔗</span>
+      <span>GitLab</span>
     </a>
-
-    <a :href="state.projectInfo.web_url + '/pipelines'" class="footer-link" target="_blank">
-      <span class="footer-link-icon">⚙️</span>
+    <a :href="state.projectInfo.web_url + '/pipelines'" class="footer-btn" target="_blank">
+      <span class="footer-btn-icon">⚙️</span>
       <span>Pipelines</span>
     </a>
-
-    <!-- tag -->
-    <a :href="state.projectInfo.web_url + '/tags'" class="footer-link" target="_blank">
-      <span class="footer-link-icon">🏷️</span>
+    <a :href="state.projectInfo.web_url + '/tags'" class="footer-btn" target="_blank">
+      <span class="footer-btn-icon">🏷️</span>
       <span>Tags</span>
     </a>
-
-    <!-- merge_requests -->
-    <a :href="state.projectInfo.web_url + '/merge_requests'" class="footer-link" target="_blank">
-      <span class="footer-link-icon">🔄</span>
+    <a :href="state.projectInfo.web_url + '/merge_requests'" class="footer-btn" target="_blank">
+      <span class="footer-btn-icon">🔀</span>
       <span>Merge Requests</span>
     </a>
   </footer>
+
+  </div><!-- /.workspace-main -->
 </div>
