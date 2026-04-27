@@ -1,16 +1,68 @@
-<div id="app" class="container" :class="{ 'has-sidebar': state.workspaceTabs && state.workspaceTabs.length > 1 }">
-  <!-- Loading 遮罩 -->
-  <div class="global-loading" v-if="tabSwitching">
-    <div class="global-loading-spinner"></div>
-    <span class="global-loading-text">切换项目中...</span>
-  </div>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+      <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+    </symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+      <path d="M2 12h20"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+    </symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 3h6v6"/>
+      <path d="M10 14 21 3"/>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+    </symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/>
+      <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </symbol>
+    <symbol id="i-git-pr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="18" cy="18" r="3"/>
+      <circle cx="6" cy="6" r="3"/>
+      <path d="M13 6h3a2 2 0 0 1 2 2v7"/>
+      <line x1="6" x2="6" y1="9" y2="21"/>
+    </symbol>
+    <symbol id="i-git-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="18" cy="18" r="3"/>
+      <circle cx="6" cy="6" r="3"/>
+      <path d="M6 21V9a9 9 0 0 0 9 9"/>
+    </symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+      <path d="M12 9v4"/>
+      <path d="M12 17h.01"/>
+    </symbol>
+  </defs>
+</svg>
 
-  <!-- 注意：Tab 栏为左侧垂直排列，显示项目缩写（第12次补充 UI 重写） -->
-  <!-- 注意：Tooltip 使用全局固定定位元素，避免被 .workspace-tabs 的 overflow 裁切（第14次补充修复） -->
+<div id="app" class="container" :class="{ 'has-sidebar': state.workspaceTabs && state.workspaceTabs.length > 1 }">
+  <!-- 顶部进度条 -->
+  <div class="tab-loading-bar" v-if="tabSwitching"></div>
+
   <aside class="workspace-tabs" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
     <div
       class="workspace-tab"
-      :class="{ 'workspace-tab-active': tab.isActive }"
+      :class="{ 'workspace-tab-active': tab.isActive, 'workspace-tab-loading': switchingTabPath === tab.fsPath }"
       v-for="tab in state.workspaceTabs"
       :key="tab.fsPath"
       @click="switchProject(tab)"
@@ -29,6 +81,23 @@
   <!-- 主内容区 -->
   <div class="workspace-main">
 
+  <!-- 骨架屏 -->
+  <div class="skeleton-wrap" v-if="tabSwitching">
+    <div class="skeleton-header">
+      <div class="skeleton-block skeleton-title"></div>
+      <div class="skeleton-block skeleton-badge"></div>
+    </div>
+    <div class="skeleton-actions">
+      <div class="skeleton-block skeleton-action-btn" v-for="i in 4" :key="i"></div>
+    </div>
+    <div class="skeleton-card" v-for="i in 3" :key="'sk' + i">
+      <div class="skeleton-block skeleton-line skeleton-line-wide"></div>
+      <div class="skeleton-block skeleton-line skeleton-line-narrow"></div>
+    </div>
+  </div>
+
+  <template v-if="!tabSwitching">
+
   <!-- 项目信息头部 -->
   <header class="app-header">
     <div class="project-title">
@@ -44,25 +113,25 @@
   <div class="quick-actions">
     <button class="quick-action-btn primary" :class="{'loading': loading.test}"
       @click="vsPostMsg({ command: 'publishToTest' })" title="发布到测试环境">
-      <span class="quick-action-icon">🚀</span>
+      <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-rocket"/></svg>
       <span class="quick-action-title">TEST</span>
     </button>
 
-    <button class="quick-action-btn" :class="{'loading': loading.cn}" 
+    <button class="quick-action-btn" :class="{'loading': loading.cn}"
       @click="vsPostMsg({ command: 'publishToCn' })" title="发布到国内生产环境">
-      <span class="quick-action-icon">🌐</span>
+      <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-globe"/></svg>
       <span class="quick-action-title">CN</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod}"
       @click="vsPostMsg({ command: 'publishToProd' })" title="发布到国际生产环境">
-      <span class="quick-action-icon">🌍</span>
+      <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-globe"/></svg>
       <span class="quick-action-title">COM</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod || loading.cn}"
       @click="vsPostMsg({ command: 'getProdAndCnInfo' })" title="复制所有合并请求链接">
-      <span class="quick-action-icon">📋</span>
+      <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-copy"/></svg>
       <span class="quick-action-title">ALL</span>
     </button>
   </div>
@@ -79,11 +148,11 @@
             <span class="merge-request-env">{{ mergeLinksLabel[env] }}</span>
             <div class="merge-request-actions">
               <a :href="url" class="merge-action-link" target="_blank">
-                <span class="merge-action-icon">🔗</span>
+                <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
                 <span>View</span>
               </a>
               <button class="merge-action-btn" @click="vsPostMsg({ command: 'copyLink', content: url, env })">
-                <span class="merge-action-icon">📋</span>
+                <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>
                 <span>Copy</span>
               </button>
             </div>
@@ -96,13 +165,15 @@
   <!-- Latest Tag -->
   <div class="section-card" v-if="tagInfo">
     <div class="section-header">
-      <span class="section-icon">🏷️</span>
+      <svg class="icon section-icon" aria-hidden="true"><use href="#i-tag"/></svg>
       <span class="section-title">Latest Tag</span>
     </div>
     <div class="section-body">
       <div class="tag-pill-row">
         <span class="tag-pill">{{ tagInfo.name }}</span>
-        <button class="icon-btn" @click="vsPostMsg({ command: 'copyText', content: tagInfo.name })" title="复制Tag名称">📋</button>
+        <button class="icon-btn" @click="vsPostMsg({ command: 'copyText', content: tagInfo.name })" title="复制Tag名称">
+          <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>
+        </button>
       </div>
       <div class="tag-meta">
         <span>{{ tagInfo.commit.short_id }}</span>
@@ -115,16 +186,21 @@
   <!-- Pipeline Status -->
   <div class="section-card" v-if="pipelineInfo">
     <div class="section-header">
-      <span class="section-icon">⚙️</span>
+      <svg class="icon section-icon" aria-hidden="true"><use href="#i-settings"/></svg>
       <span class="section-title">Pipeline Status</span>
     </div>
     <div class="section-body">
       <div class="pipeline-row">
-        <span class="pipeline-ref-badge">🔀 {{ pipelineInfo.ref }}</span>
+        <span class="pipeline-ref-badge">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-git-merge"/></svg>
+          {{ pipelineInfo.ref }}
+        </span>
         <span class="pipeline-status-badge" :class="'status-' + pipelineInfo.status">
           {{ pipelineInfo.status.toUpperCase() }}
         </span>
-        <a :href="pipelineInfo.web_url" class="icon-btn-link" target="_blank" title="查看Pipeline详情">🔗</a>
+        <a :href="pipelineInfo.web_url" class="icon-btn-link" target="_blank" title="查看Pipeline详情">
+          <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
+        </a>
       </div>
     </div>
   </div>
@@ -132,7 +208,7 @@
   <!-- Related MRs (Pipeline 已合并 MR) -->
   <div class="section-card" v-if="pipelineMergedMRs.length > 0">
     <div class="section-header">
-      <span class="section-icon">🔀</span>
+      <svg class="icon section-icon" aria-hidden="true"><use href="#i-git-pr"/></svg>
       <span class="section-title">Related MRs</span>
       <span class="section-count">{{ pipelineMergedMRs.length }}</span>
     </div>
@@ -140,12 +216,20 @@
       <div class="mr-card" v-for="mr in pipelineMergedMRs.slice(0, 2)" :key="'pipeline-' + mr.id">
         <div class="mr-card-title-row">
           <a :href="mr.web_url" class="mr-card-title" target="_blank" :title="mr.title">{{ mr.title }}</a>
-          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
+          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"/></svg>
+          </button>
         </div>
         <div class="mr-card-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</div>
         <div class="mr-card-meta">
-          <span v-if="mr.author">👤 {{ mr.author.name }}</span>
-          <span v-if="mr.merged_at">🕐 {{ formatPipelineTime(mr.merged_at) }}</span>
+          <span v-if="mr.author" class="meta-item">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-user"/></svg>
+            {{ mr.author.name }}
+          </span>
+          <span v-if="mr.merged_at" class="meta-item">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"/></svg>
+            {{ formatPipelineTime(mr.merged_at) }}
+          </span>
         </div>
       </div>
     </div>
@@ -154,7 +238,7 @@
   <!-- Active Merge Requests -->
   <div class="section-card" v-if="activeMergeRequests && activeMergeRequests.length > 0">
     <div class="section-header">
-      <span class="section-icon">🔀</span>
+      <svg class="icon section-icon" aria-hidden="true"><use href="#i-git-pr"/></svg>
       <span class="section-title">Active Merge Requests</span>
       <span class="section-count">{{ activeMergeRequests.length }}</span>
     </div>
@@ -162,15 +246,23 @@
       <div class="mr-card" v-for="mr in activeMergeRequests" :key="mr.id">
         <div class="mr-card-title-row">
           <a :href="mr.web_url" class="mr-card-title" target="_blank" :title="mr.title">{{ mr.title }}</a>
-          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">📋</button>
+          <button class="icon-btn small" @click="copyMrInfo(mr)" title="复制MR信息">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"/></svg>
+          </button>
         </div>
         <div class="mr-card-branch">{{ mr.source_branch }} → {{ mr.target_branch }}</div>
         <div class="mr-card-meta">
-          <span v-if="mr.author">👤 {{ mr.author.name }}</span>
+          <span v-if="mr.author" class="meta-item">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-user"/></svg>
+            {{ mr.author.name }}
+          </span>
           <span class="mr-card-status" :class="'mr-status-' + mr.merge_status">
             {{ formatMergeStatus(mr.merge_status) }}
           </span>
-          <span v-if="mr.has_conflicts" class="mr-card-conflict">⚠️ 有冲突</span>
+          <span v-if="mr.has_conflicts" class="mr-card-conflict meta-item">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"/></svg>
+            有冲突
+          </span>
         </div>
       </div>
     </div>
@@ -179,22 +271,24 @@
   <!-- 项目链接 -->
   <footer class="app-footer" v-if="state.projectInfo.web_url">
     <a :href="state.projectInfo.web_url" class="footer-btn" target="_blank">
-      <span class="footer-btn-icon">🔗</span>
+      <svg class="icon footer-btn-icon" aria-hidden="true"><use href="#i-link"/></svg>
       <span>GitLab</span>
     </a>
     <a :href="state.projectInfo.web_url + '/pipelines'" class="footer-btn" target="_blank">
-      <span class="footer-btn-icon">⚙️</span>
+      <svg class="icon footer-btn-icon" aria-hidden="true"><use href="#i-settings"/></svg>
       <span>Pipelines</span>
     </a>
     <a :href="state.projectInfo.web_url + '/tags'" class="footer-btn" target="_blank">
-      <span class="footer-btn-icon">🏷️</span>
+      <svg class="icon footer-btn-icon" aria-hidden="true"><use href="#i-tag"/></svg>
       <span>Tags</span>
     </a>
     <a :href="state.projectInfo.web_url + '/merge_requests'" class="footer-btn" target="_blank">
-      <span class="footer-btn-icon">🔀</span>
+      <svg class="icon footer-btn-icon" aria-hidden="true"><use href="#i-git-pr"/></svg>
       <span>Merge Requests</span>
     </a>
   </footer>
+
+  </template><!-- /v-if="!tabSwitching" -->
 
   </div><!-- /.workspace-main -->
 </div>

@@ -32,6 +32,7 @@ new Vue({
       activeMergeRequests: __INITIAL_DATA__.activeMergeRequests || [],
       pipelineMergedMRs: __INITIAL_DATA__.pipelineMergedMRs || [],
       tabSwitching: false,
+      switchingTabPath: '',
       tabTooltip: { visible: false, text: '', top: 0, left: 0 },
       mergeLinks: {
         test: "",
@@ -75,6 +76,7 @@ new Vue({
         return;
       }
       this.tabSwitching = true;
+      this.switchingTabPath = tab.fsPath;
       this.vsPostMsg({
         command: 'switchProject',
         fsPath: tab.fsPath,
@@ -195,13 +197,13 @@ new Vue({
     /** 格式化 MR merge_status 为可读文本 */
     formatMergeStatus(status) {
       const statusMap = {
-        can_be_merged: '✅ 可合并',
-        cannot_be_merged: '❌ 不可合并',
-        cannot_be_merged_recheck: '❌ 不可合并',
-        unchecked: '⏳ 未检查',
-        checking: '🔄 检查中',
-        ci_must_pass: '⏳ CI待通过',
-        ci_still_running: '🔄 CI运行中',
+        can_be_merged: '可合并',
+        cannot_be_merged: '不可合并',
+        cannot_be_merged_recheck: '不可合并',
+        unchecked: '未检查',
+        checking: '检查中',
+        ci_must_pass: 'CI待通过',
+        ci_still_running: 'CI运行中',
       };
       return statusMap[status] || status;
     },
