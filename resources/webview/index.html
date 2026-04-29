@@ -69,7 +69,9 @@
       @mouseenter="showTabTooltip($event, tab)"
       @mouseleave="hideTabTooltip()"
     >
-      <span class="workspace-tab-abbr">{{ getTabAbbr(tab.name) }}</span>
+      <!-- 修改于260429第2次补充：展开式tab，默认显示缩写，展开时显示完整名称 -->
+      <span class="workspace-tab-abbr workspace-tab-abbr-short">{{ getTabAbbr(tab.name) }}</span>
+      <span class="workspace-tab-abbr workspace-tab-abbr-long">{{ tab.name }}</span>
     </div>
   </aside>
 
@@ -81,18 +83,42 @@
   <!-- 主内容区 -->
   <div class="workspace-main">
 
-  <!-- 骨架屏 -->
+  <!-- 骨架屏 — 修改于260429第6次补充：覆盖所有主要元素 -->
   <div class="skeleton-wrap" v-if="tabSwitching">
+    <!-- Header 信息 -->
     <div class="skeleton-header">
       <div class="skeleton-block skeleton-title"></div>
       <div class="skeleton-block skeleton-badge"></div>
     </div>
+    
+    <!-- 项目描述 -->
+    <div class="skeleton-block skeleton-description"></div>
+    
+    <!-- 快速操作按钮 -->
     <div class="skeleton-actions">
       <div class="skeleton-block skeleton-action-btn" v-for="i in 4" :key="i"></div>
     </div>
-    <div class="skeleton-card" v-for="i in 3" :key="'sk' + i">
-      <div class="skeleton-block skeleton-line skeleton-line-wide"></div>
-      <div class="skeleton-block skeleton-line skeleton-line-narrow"></div>
+    
+    <!-- Merge Requests 面板 -->
+    <div class="skeleton-panel">
+      <div class="skeleton-panel-header">
+        <div class="skeleton-block skeleton-panel-title"></div>
+      </div>
+      <div class="skeleton-panel-content">
+        <div class="skeleton-mr-item" v-for="i in 3" :key="'mr' + i">
+          <div class="skeleton-block skeleton-mr-line skeleton-mr-line-wide"></div>
+          <div class="skeleton-block skeleton-mr-line skeleton-mr-line-narrow"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Pipeline / Tag / MR 信息卡 -->
+    <div class="skeleton-info-cards">
+      <div class="skeleton-card" v-for="i in 3" :key="'sk' + i">
+        <div class="skeleton-block skeleton-line skeleton-line-wide"></div>
+        <div class="skeleton-block skeleton-line skeleton-line-wide"></div>
+        <div class="skeleton-block skeleton-line skeleton-line-narrow"></div>
+      </div>
     </div>
   </div>
 
@@ -209,7 +235,7 @@
   <div class="section-card" v-if="pipelineMergedMRs.length > 0">
     <div class="section-header">
       <svg class="icon section-icon" aria-hidden="true"><use href="#i-git-pr"/></svg>
-      <span class="section-title">Related MRs</span>
+      <span class="section-title">Pipeline Related MRs</span>
       <span class="section-count">{{ pipelineMergedMRs.length }}</span>
     </div>
     <div class="section-body mr-card-list">

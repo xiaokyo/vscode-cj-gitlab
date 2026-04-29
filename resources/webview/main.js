@@ -34,6 +34,8 @@ new Vue({
       tabSwitching: false,
       switchingTabPath: '',
       tabTooltip: { visible: false, text: '', top: 0, left: 0 },
+      /* 修改于260429第2次补充：添加tabs展开状态 */
+      tabsExpanded: false,
       mergeLinks: {
         test: "",
         cn: "",
@@ -84,21 +86,16 @@ new Vue({
     },
 
     /**
-     * 注意：显示 Tab tooltip，使用 fixed 定位避免被 .workspace-tabs 的 overflow 裁切
-     * 需求来源：第14次补充 — tab悬浮展示没出来的修复
+     * 注意：改为展开式tab，不再使用tooltip
+     * 需求来源：260429第2次补充 — 展开式tab显示完整名称
+     * 此方法保留用于兼容HTML模板中的事件绑定，由CSS :hover实现展开效果
      */
     showTabTooltip(event, tab) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      this.tabTooltip = {
-        visible: true,
-        text: tab.name,
-        top: rect.top + rect.height / 2,
-        left: rect.right + 8,
-      };
+      // 已改为展开式tab，展开效果由CSS :hover和workspace-tabs:hover实现
     },
 
     hideTabTooltip() {
-      this.tabTooltip.visible = false;
+      // 已改为展开式tab，还原效果由CSS自动实现
     },
 
     /** 悬浮展示 Tab 全量信息，避免名称/分支被截断导致难以区分 */

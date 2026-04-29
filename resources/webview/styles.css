@@ -109,14 +109,21 @@ body {
 }
 
 .skeleton-title {
-  height: 20px;
+  height: 24px;  /* 修改于260429第7次补充：从20px增加到24px */
   width: 55%;
 }
 
 .skeleton-badge {
-  height: 22px;
+  height: 26px;  /* 修改于260429第7次补充：从22px增加到26px */
   width: 80px;
   border-radius: 10px;
+}
+
+/* 修改于260429第6次补充：添加项目描述骨架屏 */
+.skeleton-description {
+  height: 18px;  /* 修改于260429第7次补充：从14px增加到18px */
+  width: 85%;
+  margin-top: 4px;
 }
 
 .skeleton-actions {
@@ -125,9 +132,59 @@ body {
 }
 
 .skeleton-action-btn {
-  height: 54px;
+  height: 60px;  /* 修改于260429第7次补充：从54px增加到60px */
   flex: 1;
   border-radius: 8px;
+}
+
+/* 修改于260429第6次补充：添加面板骨架屏 */
+.skeleton-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+}
+
+.skeleton-panel-header {
+  display: flex;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.skeleton-panel-title {
+  height: 22px;  /* 修改于260429第7次补充：从18px增加到22px */
+  width: 40%;
+}
+
+.skeleton-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-mr-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.skeleton-mr-line {
+  height: 16px;  /* 修改于260429第7次补充：从12px增加到16px */
+  border-radius: 2px;
+}
+
+.skeleton-mr-line-wide { width: 80%; }
+.skeleton-mr-line-narrow { width: 50%; }
+
+/* 修改于260429第6次补充：添加信息卡片容器 */
+.skeleton-info-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .skeleton-card {
@@ -140,7 +197,7 @@ body {
 }
 
 .skeleton-line {
-  height: 13px;
+  height: 17px;  /* 修改于260429第7次补充：从13px增加到17px */
   border-radius: 3px;
 }
 
@@ -172,6 +229,21 @@ body {
   height: 100vh;
   position: sticky;
   top: 0;
+  /* 修改于260429第3次补充：改为fixed定位，不影响右边布局 */
+  position: fixed;
+  z-index: 999;
+  left: 0;
+  /* 修改于260429：支持展开式tab，width改为动态过渡 */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), align-items 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 修改于260429：悬浮时展开tab栏 */
+.workspace-tabs:hover {
+  width: 240px;
+  align-items: stretch;
+  padding: 8px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .workspace-tabs::-webkit-scrollbar {
@@ -183,25 +255,42 @@ body {
   min-width: 0;
   padding: 12px 16px;
   overflow-y: auto;
+  /* 修改于260429第3次补充：添加margin-left以适应fixed的tabs宽度 */
+  margin-left: 52px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Tab 项：方块缩写 */
 .workspace-tab {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  justify-content: flex-start;
+  min-height: 36px;
+  padding: 0 12px;
   border-radius: 8px;
   cursor: pointer;
   background: transparent;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   flex-shrink: 0;
   position: relative;
+  width: 100%;
+  /* 修改于260429：默认宽度与tabs宽度相同（只显示缩写在36px宽内） */
+}
+
+.workspace-tab {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+}
+
+.workspace-tabs:hover .workspace-tab {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0 12px;
 }
 
 .workspace-tab:hover {
-  background: rgba(249, 178, 215, 0.2);
+  background: rgba(249, 178, 215, 0.3);
 }
 
 .workspace-tab-active {
@@ -215,6 +304,33 @@ body {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   user-select: none;
+  /* 修改于260429：支持展开时显示完整名称 */
+  transition: all 0.3s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 修改于260429：默认显示缩写 */
+.workspace-tab-abbr-short {
+  display: block;
+}
+
+.workspace-tab-abbr-long {
+  display: none;
+}
+
+/* 修改于260429：tabs展开时，显示完整名称 */
+.workspace-tabs:hover .workspace-tab-abbr-short {
+  display: none;
+}
+
+.workspace-tabs:hover .workspace-tab-abbr-long {
+  display: block;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .workspace-tab-active .workspace-tab-abbr {
@@ -249,22 +365,11 @@ body {
 }
 
 /**
- * 注意：Tab tooltip 使用全局固定定位元素，避免被 .workspace-tabs 的 overflow 裁切
- * 需求来源：第14次补充 — tab悬浮展示没出来的修复
+ * 注意：Tab tooltip 已改为展开式tab，不再使用tooltip
+ * 需求来源：260429第2次补充 — 展开式tab显示完整名称
  */
 .tab-tooltip {
-  position: fixed;
-  transform: translateY(-50%);
-  background: var(--vscode-editorHoverWidget-background, #2d2d30);
-  color: var(--vscode-editorHoverWidget-foreground, #cccccc);
-  border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  white-space: nowrap;
-  z-index: 100;
-  pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: none;
 }
 
 /* ========== Header ========== */
@@ -700,28 +805,42 @@ body {
   font-size: 12px;
 }
 
-/* ========== Footer 2x2 Grid ========== */
+/* ========== Footer 4-Column Layout ========== */
 .app-footer {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 0;
   padding-top: 10px;
   border-top: 1px solid var(--vscode-widget-border);
+  /* 修改于260429第5次补充：改为4列水平排布，响应式设计 */
+}
+
+/* 响应式设计：在窄屏幕上改为2列 */
+@media (max-width: 800px) {
+  .app-footer {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .footer-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 12px 8px;
   border: 1px solid var(--vscode-widget-border);
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--vscode-descriptionForeground);
   text-decoration: none;
   font-size: 12px;
   transition: all 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-direction: column;
+  /* 修改于260429第5次补充：改为垂直排布（图标在上，文字在下） */
 }
 
 .footer-btn:hover {
@@ -731,9 +850,10 @@ body {
 }
 
 .footer-btn-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+  /* 修改于260429第5次补充：增大图标尺寸 */
 }
 
 /* ========== 加载状态 ========== */
