@@ -251,13 +251,16 @@ body {
 }
 
 .workspace-main {
-  flex: 1;
-  min-width: 0;
   padding: 12px 16px;
   overflow-y: auto;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.container.has-sidebar .workspace-main {
+  flex: 1;
+  min-width: 0;
   /* 修改于260429第3次补充：添加margin-left以适应fixed的tabs宽度 */
   margin-left: 52px;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Tab 项：方块缩写 */
