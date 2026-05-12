@@ -28,6 +28,15 @@ export class GitlabService {
     return !this.baseUrl || !this.token;
   }
 
+  /**
+   * 获取项目对应环境的自定义分支名，未配置返回 undefined
+   */
+  private getBranchFromMapping(env: 'com' | 'cn' | 'test', projectName: string): string | undefined {
+    const config = vscode.workspace.getConfiguration('cj-gitlab');
+    const mapping: Record<string, Record<string, string>> = config.get('branchMapping') || {};
+    return mapping[projectName]?.[env];
+  }
+
   getBaseUrl() {
     return this.baseUrl;
   }
@@ -471,6 +480,12 @@ export class GitlabService {
   }
 
   async findProdBranch(projectId: number) {
+    const projectName = await this.getCurrentProjectName();
+    const customBranch = this.getBranchFromMapping('com', projectName);
+    if (customBranch) {
+      return customBranch;
+    }
+
     if (!projectId) {
       return "master";
     }
@@ -485,6 +500,12 @@ export class GitlabService {
   }
 
   async findCnBranch(projectId: number) {
+    const projectName = await this.getCurrentProjectName();
+    const customBranch = this.getBranchFromMapping('cn', projectName);
+    if (customBranch) {
+      return customBranch;
+    }
+
     if (!projectId) {
       return "cn";
     }
@@ -498,6 +519,13 @@ export class GitlabService {
 
   async getTestBranch() {
     const workspaceKey = this.getCurrentWorkspaceKey();
+    const projectName = await this.getCurrentProjectName();
+    const customBranch = this.getBranchFromMapping('test', projectName);
+    if (customBranch) {
+      this.testBranchNames.set(workspaceKey, customBranch);
+      return customBranch;
+    }
+
     const { id: projectId } = await this.getProjectInfo();
     const cachedTestBranch = this.testBranchNames.get(workspaceKey);
     if (cachedTestBranch) {

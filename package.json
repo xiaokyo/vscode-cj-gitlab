@@ -62,6 +62,28 @@
           "type": "string",
           "default": "",
           "description": "GitLab Personal Access Token"
+        },
+        "cj-gitlab.branchMapping": {
+          "type": "object",
+          "default": {},
+          "description": "按项目名配置各环境的目标分支。格式: { \"project-name\": { \"com\": \"release\", \"cn\": \"master-cn\", \"test\": \"master\" } }。未配置的项目走默认逻辑。",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "com": {
+                "type": "string",
+                "description": "COM线上环境目标分支"
+              },
+              "cn": {
+                "type": "string",
+                "description": "CN线上环境目标分支"
+              },
+              "test": {
+                "type": "string",
+                "description": "测试环境目标分支"
+              }
+            }
+          }
         }
       }
     }

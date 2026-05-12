@@ -17,9 +17,11 @@ https://marketplace.cursorapi.com/items?itemName=xiaokyo.cj-gitlab
 
 ## 使用方法
 
+### 基础配置
+
 在 vscode 配置如下
 
-```
+```json
 "cj-gitlab.apiUrl": "http://192.168.5.143:1180",
 "cj-gitlab.token": "xxxxxx"
 ```
@@ -27,6 +29,33 @@ https://marketplace.cursorapi.com/items?itemName=xiaokyo.cj-gitlab
 获取 gitlab token页面
 
 http://192.168.5.143:1180/profile/personal_access_tokens
+
+### 分支映射配置（可选）
+
+如果项目的环境分支与默认规则不符，可以通过 `branchMapping` 配置自定义各环境的目标分支。
+
+**默认行为：**
+- **测试环境（test）**：优先查找 `release` 分支，有则合并到 `master`，否则合并到 `dev`
+- **CN 线上环境（cn）**：优先查找 `master-cn` 分支，有则合并到 `master-cn`，否则合并到 `cn`
+- **COM 线上环境（com）**：优先查找 `release` 分支，有则合并到 `release`，否则合并到 `master`
+
+**自定义配置示例：**
+
+```json
+"cj-gitlab.branchMapping": {
+  "project-a": {
+    "test": "master",
+    "cn": "master-cn",
+    "com": "release"
+  },
+  "project-b": {
+    "test": "dev-test"
+  }
+}
+```
+
+- 已配置的项目和环境按配置值优先级执行
+- 未配置或未指定环境的项目自动走默认逻辑
 
 ## 贡献指南
 
