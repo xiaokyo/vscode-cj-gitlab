@@ -215,6 +215,14 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
             if (folder) {
               this._gitlabService.setTargetProjectByWorkspaceFolder(folder);
               await this.refresh();
+            } else {
+              // 尝试作为 submodule 处理
+              this._gitlabService.setTargetProjectByWorkspaceFolder({
+                uri: vscode.Uri.file(data.fsPath),
+                name: data.fsPath.split("/").pop() || "unknown",
+                index: -1,
+              } as vscode.WorkspaceFolder);
+              await this.refresh();
             }
           } catch (error: any) {
             Toast.error(error.message || "切换项目失败");

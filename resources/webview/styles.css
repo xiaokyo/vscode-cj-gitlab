@@ -340,6 +340,23 @@ body {
   color: #1e1e1e;
 }
 
+.workspace-tab-submodule {
+  opacity: 0.75;
+}
+
+.workspace-tab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #007acc;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 3px;
+  letter-spacing: 0px;
+}
+
 .workspace-tab-loading .workspace-tab-abbr {
   opacity: 0.15;
 }

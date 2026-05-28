@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { exec } from "child_process";
 import { promisify } from "util";
+import * as path from "path";
 import { Project } from "./types/Project";
 import { MergeResponse } from "./types/MergeRequest";
 import { Branch } from "./types/Branch";
@@ -53,6 +54,16 @@ export class GitlabService {
       if (selectedFolder) {
         return selectedFolder;
       }
+
+      // 检查是否是 submodule 路径（不一定在工作区文件夹中）
+      if (this.selectedWorkspaceRootPath.includes("/")) {
+        return {
+          uri: vscode.Uri.file(this.selectedWorkspaceRootPath),
+          name: this.selectedWorkspaceRootPath.split("/").pop() || "unknown",
+          index: -1,
+        } as vscode.WorkspaceFolder;
+      }
+
       this.selectedWorkspaceRootPath = null;
     }
 
@@ -152,7 +163,87 @@ export class GitlabService {
   }
 
   /**
+   * 获取 Git submodule 列表信息
+   */
+  private async getSubmodules(): Promise<
+    Array<{
+      name: string;
+      path: string;
+      branch: string;
+      url: string;
+    }>
+  > {
+    try {
+      const { stdout } = await execAsync(
+        "git config --file .gitmodules --name-only --get-regexp path",
+        { cwd: this.getCurrentWorkspaceRootPath() }
+      );
+
+      if (!stdout.trim()) {
+        return [];
+      }
+
+      const submodules: Array<{
+        name: string;
+        path: string;
+        branch: string;
+        url: string;
+      }> = [];
+      const moduleNames = stdout
+        .trim()
+        .split("\n")
+        .map((line) => line.split(".")[1])
+        .filter((name, index, arr) => arr.indexOf(name) === index);
+
+      for (const moduleName of moduleNames) {
+        try {
+          const { stdout: subPath } = await execAsync(
+            `git config --file .gitmodules --get submodule.${moduleName}.path`,
+            { cwd: this.getCurrentWorkspaceRootPath() }
+          );
+          const { stdout: subUrl } = await execAsync(
+            `git config --file .gitmodules --get submodule.${moduleName}.url`,
+            { cwd: this.getCurrentWorkspaceRootPath() }
+          );
+
+          const submodulePath = subPath.trim();
+          const fullPath = path.join(
+            this.getCurrentWorkspaceRootPath(),
+            submodulePath
+          );
+
+          let branch = "N/A";
+          try {
+            const { stdout: subBranch } = await execAsync(
+              "git rev-parse --abbrev-ref HEAD",
+              { cwd: fullPath }
+            );
+            branch = subBranch.trim();
+          } catch {
+            // 如果子模块还没有初始化，分支为 N/A
+          }
+
+          submodules.push({
+            name: moduleName,
+            path: submodulePath,
+            branch,
+            url: subUrl.trim(),
+          });
+        } catch (err) {
+          console.error(`Failed to get submodule info for ${moduleName}:`, err);
+        }
+      }
+
+      return submodules;
+    } catch (err) {
+      // 没有 .gitmodules 文件或其他错误
+      return [];
+    }
+  }
+
+  /**
    * 获取所有工作区项目的信息（名称、分支等），用于多项目 Tab 展示
+   * 现在包含 submodule 子项目
    */
   async getAllWorkspaceProjectInfos(): Promise<
     Array<{
@@ -160,6 +251,7 @@ export class GitlabService {
       branch: string;
       fsPath: string;
       isActive: boolean;
+      isSubmodule?: boolean;
     }>
   > {
     const workspaceFolders = vscode.workspace.workspaceFolders || [];
@@ -169,8 +261,10 @@ export class GitlabService {
       branch: string;
       fsPath: string;
       isActive: boolean;
+      isSubmodule?: boolean;
     }> = [];
 
+    // 添加工作区项目
     for (const folder of workspaceFolders) {
       try {
         const { stdout: branch } = await execAsync(
@@ -191,6 +285,26 @@ export class GitlabService {
           isActive: folder.uri.fsPath === currentPath,
         });
       }
+    }
+
+    // 添加 submodule（仅在工作区项目为当前项目时）
+    try {
+      const submodules = await this.getSubmodules();
+      for (const submodule of submodules) {
+        const submodulePath = path.join(
+          this.getCurrentWorkspaceRootPath(),
+          submodule.path
+        );
+        results.push({
+          name: submodule.name,
+          branch: submodule.branch,
+          fsPath: submodulePath,
+          isActive: submodulePath === currentPath,
+          isSubmodule: true,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to get submodules:", err);
     }
 
     return results;
