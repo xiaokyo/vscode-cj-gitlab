@@ -163,9 +163,11 @@ export class GitlabService {
   }
 
   /**
-   * 获取 Git submodule 列表信息
+   * 获取 Git submodule 列表信息（从指定工作区读取）
    */
-  private async getSubmodules(): Promise<
+  private async getSubmodulesForWorkspace(
+    workspacePath: string
+  ): Promise<
     Array<{
       name: string;
       path: string;
@@ -176,7 +178,7 @@ export class GitlabService {
     try {
       const { stdout } = await execAsync(
         "git config --file .gitmodules --name-only --get-regexp path",
-        { cwd: this.getCurrentWorkspaceRootPath() }
+        { cwd: workspacePath }
       );
 
       if (!stdout.trim()) {
@@ -199,18 +201,15 @@ export class GitlabService {
         try {
           const { stdout: subPath } = await execAsync(
             `git config --file .gitmodules --get submodule.${moduleName}.path`,
-            { cwd: this.getCurrentWorkspaceRootPath() }
+            { cwd: workspacePath }
           );
           const { stdout: subUrl } = await execAsync(
             `git config --file .gitmodules --get submodule.${moduleName}.url`,
-            { cwd: this.getCurrentWorkspaceRootPath() }
+            { cwd: workspacePath }
           );
 
           const submodulePath = subPath.trim();
-          const fullPath = path.join(
-            this.getCurrentWorkspaceRootPath(),
-            submodulePath
-          );
+          const fullPath = path.join(workspacePath, submodulePath);
 
           let branch = "N/A";
           try {
@@ -220,7 +219,7 @@ export class GitlabService {
             );
             branch = subBranch.trim();
           } catch {
-            // 如果子模块还没有初始化，分支为 N/A
+            // submodule 未初始化
           }
 
           submodules.push({
@@ -236,7 +235,6 @@ export class GitlabService {
 
       return submodules;
     } catch (err) {
-      // 没有 .gitmodules 文件或其他错误
       return [];
     }
   }
@@ -287,24 +285,25 @@ export class GitlabService {
       }
     }
 
-    // 添加 submodule（仅在工作区项目为当前项目时）
-    try {
-      const submodules = await this.getSubmodules();
-      for (const submodule of submodules) {
-        const submodulePath = path.join(
-          this.getCurrentWorkspaceRootPath(),
-          submodule.path
+    // 添加 submodule（遍历所有工作区，每个工作区独立读取其 submodule）
+    for (const folder of workspaceFolders) {
+      try {
+        const submodules = await this.getSubmodulesForWorkspace(
+          folder.uri.fsPath
         );
-        results.push({
-          name: submodule.name,
-          branch: submodule.branch,
-          fsPath: submodulePath,
-          isActive: submodulePath === currentPath,
-          isSubmodule: true,
-        });
+        for (const submodule of submodules) {
+          const submodulePath = path.join(folder.uri.fsPath, submodule.path);
+          results.push({
+            name: submodule.name,
+            branch: submodule.branch,
+            fsPath: submodulePath,
+            isActive: submodulePath === currentPath,
+            isSubmodule: true,
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to get submodules for ${folder.name}:`, err);
       }
-    } catch (err) {
-      console.error("Failed to get submodules:", err);
     }
 
     return results;

@@ -62,17 +62,15 @@
   <aside class="workspace-tabs" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
     <div
       class="workspace-tab"
-      :class="{ 'workspace-tab-active': tab.isActive, 'workspace-tab-loading': switchingTabPath === tab.fsPath, 'workspace-tab-submodule': tab.isSubmodule }"
+      :class="{ 'workspace-tab-active': tab.isActive, 'workspace-tab-loading': switchingTabPath === tab.fsPath }"
       v-for="tab in state.workspaceTabs"
       :key="tab.fsPath"
       @click="switchProject(tab)"
       @mouseenter="showTabTooltip($event, tab)"
       @mouseleave="hideTabTooltip()"
     >
-      <!-- 修改于260429第2次补充：展开式tab，默认显示缩写，展开时显示完整名称 -->
       <span class="workspace-tab-abbr workspace-tab-abbr-short">{{ getTabAbbr(tab.name) }}</span>
       <span class="workspace-tab-abbr workspace-tab-abbr-long">{{ tab.name }}</span>
-      <!-- 子模块标签 -->
       <span v-if="tab.isSubmodule" class="workspace-tab-badge">SM</span>
     </div>
   </aside>
