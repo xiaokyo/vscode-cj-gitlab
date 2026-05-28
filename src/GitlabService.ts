@@ -208,7 +208,7 @@ export class GitlabService {
       if (res.length === 0) {
         throw new Error("未找到相关项目");
       }
-      const findProject = res.find((project) => project.name === projectName);
+      const findProject = res.find((project) => project.name === projectName || project.path === projectName);
       if (!findProject) {
         throw new Error("未找到相关项目");
       }
