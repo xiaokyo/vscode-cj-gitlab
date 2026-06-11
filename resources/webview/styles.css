@@ -444,6 +444,34 @@ body {
 }
 
 /* ========== 快捷操作区 ========== */
+/* 一键批量合并按钮，需求来源 6.11调整 第1次提交 */
+.batch-merge-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--vscode-button-background);
+  border-radius: 10px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.batch-merge-btn:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.batch-merge-btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

@@ -8,6 +8,7 @@ import { Branch } from "./types/Branch";
 import { MergeRequestN } from "./types/mergeRequestN";
 import { Pipeline } from "./types/Pipeline";
 import { Tag } from "./types/Tag";
+import { BatchItemResult, BatchTarget, PublishEnv } from "./types/BatchPublish";
 import Modal from "./utils/modal";
 
 const execAsync = promisify(exec);
@@ -757,5 +758,110 @@ export class GitlabService {
       console.error('获取最新tag失败:', error);
       return null;
     }
+  }
+
+  /**
+   * 拼装合并请求复制文案（项目名/commit/环境/链接）
+   * 注意：原文案逻辑在 CJGitlabView.copyLink，下沉至此供单项目与批量合并复用
+   * 需求来源：6.11调整 第1次提交 — cn/com 需复制 MR 信息
+   */
+  async buildMergeInfo(env: PublishEnv, webUrl: string): Promise<string> {
+    const projectInfo = await this.getProjectInfo();
+    const envMap: Record<PublishEnv, string> = {
+      test: "测试",
+      cn: "线上(CN)",
+      com: "线上(COM)",
+    };
+    const commitLastLog = await this.getCommitLogLastTitle();
+    return `项目名称：${projectInfo.name}\ncommit信息: ${commitLastLog}\n合并环境: ${envMap[env]}\n链接: ${webUrl}`;
+  }
+
+  /**
+   * 单环境合并：test 自动 accept，cn/com 仅创建 MR
+   * 复用 publishDevloperEnv / applyMergeRequest，不重写合并逻辑
+   */
+  private async publishEnv(env: PublishEnv) {
+    if (env === "test") {
+      return this.publishDevloperEnv();
+    }
+    const { id } = await this.getProjectInfo();
+    const branch =
+      env === "cn" ? await this.findCnBranch(id) : await this.findProdBranch(id);
+    const { mergeRequestResponse } = await this.applyMergeRequest(branch, true);
+    return mergeRequestResponse;
+  }
+
+  /**
+   * 一键批量合并：对一组项目 × 一组环境循环执行
+   * 单项目/单环境失败不中断整体，跳过并记录，全部跑完返回汇总明细
+   * 需求来源：6.11调整 第1次提交
+   */
+  async batchPublish(
+    targets: BatchTarget[],
+    envs: PublishEnv[],
+    onProgress?: (done: number, total: number, label: string) => void
+  ): Promise<BatchItemResult[]> {
+    const results: BatchItemResult[] = [];
+    const total = targets.length * envs.length;
+    let done = 0;
+
+    for (const target of targets) {
+      this.setTargetProjectByWorkspaceFolder({
+        uri: vscode.Uri.file(target.fsPath),
+        name: target.name,
+        index: -1,
+      } as vscode.WorkspaceFolder);
+
+      let dirty = false;
+      try {
+        await this.checkStatusNoCommit();
+      } catch (err: any) {
+        dirty = true;
+      }
+
+      for (const env of envs) {
+        onProgress?.(done, total, `${target.name} · ${env.toUpperCase()}`);
+        if (dirty) {
+          results.push({
+            projectName: target.name,
+            fsPath: target.fsPath,
+            env,
+            status: "skipped",
+            message: "有未提交的文件，已跳过",
+          });
+          done++;
+          continue;
+        }
+        try {
+          const mr = await this.publishEnv(env);
+          const item: BatchItemResult = {
+            projectName: target.name,
+            fsPath: target.fsPath,
+            env,
+            status: "success",
+            message: env === "test" ? "已自动合并" : "已创建合并请求",
+            webUrl: mr.web_url,
+          };
+          if (env !== "test") {
+            item.mergeInfo = await this.buildMergeInfo(env, mr.web_url);
+          }
+          results.push(item);
+        } catch (err: any) {
+          const message = err?.message || "未知错误";
+          const skipped = message.includes("已经合并");
+          results.push({
+            projectName: target.name,
+            fsPath: target.fsPath,
+            env,
+            status: skipped ? "skipped" : "failed",
+            message,
+          });
+        }
+        done++;
+      }
+    }
+
+    onProgress?.(done, total, "完成");
+    return results;
   }
 }

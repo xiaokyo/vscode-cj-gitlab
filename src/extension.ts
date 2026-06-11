@@ -43,6 +43,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("cj-gitlab.batchMerge", () => {
+      provider.batchMerge();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("cj-gitlab.selectTargetProject", async () => {
       try {
         await provider.selectTargetProject();

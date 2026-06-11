@@ -135,6 +135,12 @@
     </p>
   </header>
 
+  <!-- 一键批量合并：多选项目+环境，需求来源 6.11调整 第1次提交 -->
+  <button class="batch-merge-btn" @click="vsPostMsg({ command: 'batchMerge' })" title="选择多个项目和环境，一键批量合并">
+    <svg class="icon" aria-hidden="true"><use href="#i-git-merge"/></svg>
+    <span>一键批量合并</span>
+  </button>
+
   <!-- 快捷操作区 -->
   <div class="quick-actions">
     <button class="quick-action-btn primary" :class="{'loading': loading.test}"

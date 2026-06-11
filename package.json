@@ -2,7 +2,7 @@
   "name": "cj-gitlab",
   "displayName": "CJ GitLab",
   "description": "GitLab integration for CJ project",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "publisher": "xiaokyo",
   "icon": "resources/gitlab.png",
   "engines": {
@@ -29,6 +29,10 @@
       {
         "command": "cj-gitlab.selectTargetProject",
         "title": "Select Target Project"
+      },
+      {
+        "command": "cj-gitlab.batchMerge",
+        "title": "CJ GitLab: 一键批量合并"
       }
     ],
     "viewsContainers": {

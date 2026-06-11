@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
-import { Toast } from "./utils/modal";
+import { PublishEnv, BatchTarget } from "./types/BatchPublish";
+import Modal, { Toast } from "./utils/modal";
 import * as fs from "fs";
 import * as path from "path";
 import GitWatch from "./GitWatch";
@@ -98,17 +99,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
   public async copyLink(data: { env: string; content: string }) {
     try {
-      const projectInfo = await this._gitlabService.getProjectInfo();
-      const envMap = {
-        test: "测试",
-        cn: "线上(CN)",
-        prod: "线上(COM)",
-      } as const;
-      const env = envMap[data.env as keyof typeof envMap];
-      const link = data.content;
-      const commitLastLog = await this._gitlabService.getCommitLogLastTitle();
-      const content = `项目名称：${projectInfo.name}\ncommit信息: ${commitLastLog}\n合并环境: ${env}\n链接: ${link}`;
-      return content;
+      // prod 是 webview 历史命名，对应 buildMergeInfo 的 com 环境
+      const env = (data.env === "prod" ? "com" : data.env) as PublishEnv;
+      return await this._gitlabService.buildMergeInfo(env, data.content);
     } catch (error: any) {
       Toast.error(error.message);
       return "";
@@ -138,6 +131,122 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       Toast.info(`已复制到剪贴板`);
     } catch (error: any) {
       Toast.error(error.message);
+    }
+  }
+
+  /**
+   * 一键批量合并：多选项目(默认全选,含submodule) + 多选环境(默认全选 test/cn/com)
+   * test 自动合并，cn/com 仅建 MR 并汇总复制 MR 信息；单项目/环境失败跳过不中断
+   * 需求来源：6.11调整 第1次提交
+   */
+  public async batchMerge() {
+    const projectInfos =
+      await this._gitlabService.getAllWorkspaceProjectInfos();
+    if (projectInfos.length === 0) {
+      Toast.error("未找到可合并的项目");
+      return;
+    }
+
+    const projectItems = projectInfos.map((p) => ({
+      label: p.name,
+      description: `分支: ${p.branch}${p.isSubmodule ? " · submodule" : ""}`,
+      picked: true,
+      fsPath: p.fsPath,
+    }));
+    const selectedProjects = await vscode.window.showQuickPick(projectItems, {
+      title: "选择要合并的项目（默认全选）",
+      placeHolder: "可多选，含 submodule 子项目",
+      canPickMany: true,
+    });
+    if (!selectedProjects || selectedProjects.length === 0) {
+      return;
+    }
+
+    const envItems: Array<{ label: string; picked: boolean; env: PublishEnv }> =
+      [
+        { label: "TEST 测试环境（自动合并）", picked: true, env: "test" },
+        { label: "CN 国内生产（仅建MR）", picked: true, env: "cn" },
+        { label: "COM 国际生产（仅建MR）", picked: true, env: "com" },
+      ];
+    const selectedEnvs = await vscode.window.showQuickPick(envItems, {
+      title: "选择合并环境（默认全选）",
+      placeHolder: "可多选",
+      canPickMany: true,
+    });
+    if (!selectedEnvs || selectedEnvs.length === 0) {
+      return;
+    }
+
+    const targets: BatchTarget[] = selectedProjects.map((p) => ({
+      fsPath: p.fsPath,
+      name: p.label,
+    }));
+    const envs = selectedEnvs.map((e) => e.env);
+
+    const results = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "一键批量合并",
+        cancellable: false,
+      },
+      (progress) =>
+        this._gitlabService.batchPublish(targets, envs, (done, total, label) => {
+          progress.report({
+            message: `(${done}/${total}) ${label}`,
+            increment: total > 0 ? 100 / total : 0,
+          });
+        })
+    );
+
+    // cn/com 成功的 MR 信息汇总复制
+    const mergeInfos = results
+      .filter((r) => r.status === "success" && r.mergeInfo)
+      .map((r) => r.mergeInfo!);
+    if (mergeInfos.length > 0) {
+      vscode.env.clipboard.writeText(mergeInfos.join("\n\n"));
+    }
+
+    await this.refresh();
+    this.showBatchSummary(results, mergeInfos.length);
+  }
+
+  private showBatchSummary(
+    results: Array<{
+      projectName: string;
+      env: PublishEnv;
+      status: string;
+      message: string;
+    }>,
+    copiedCount: number
+  ) {
+    const envLabel: Record<string, string> = { test: "TEST", cn: "CN", com: "COM" };
+    const fmt = (r: (typeof results)[number]) =>
+      `${r.projectName} · ${envLabel[r.env]}：${r.message}`;
+    const success = results.filter((r) => r.status === "success");
+    const skipped = results.filter((r) => r.status === "skipped");
+    const failed = results.filter((r) => r.status === "failed");
+
+    const lines: string[] = [
+      `成功 ${success.length} · 跳过 ${skipped.length} · 失败 ${failed.length}`,
+    ];
+    if (copiedCount > 0) {
+      lines.push(`已复制 ${copiedCount} 条 MR 信息到剪贴板`);
+    }
+    if (success.length) {
+      lines.push("", "✅ 成功:", ...success.map(fmt));
+    }
+    if (skipped.length) {
+      lines.push("", "⏭️ 跳过:", ...skipped.map(fmt));
+    }
+    if (failed.length) {
+      lines.push("", "❌ 失败:", ...failed.map(fmt));
+    }
+    const detail = lines.join("\n");
+
+    if (success.length === 0 && failed.length > 0) {
+      Modal.warning("一键批量合并：全部失败", { detail });
+    } else {
+      Modal.info("一键批量合并完成", { detail });
     }
   }
 
@@ -199,6 +308,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           break;
         case "publishToTest":
           this.publishToTest();
+          break;
+        case "batchMerge":
+          this.batchMerge();
           break;
         case "selectTargetProject":
           try {
