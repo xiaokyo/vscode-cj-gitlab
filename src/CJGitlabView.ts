@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
 import { PublishEnv, BatchTarget } from "./types/BatchPublish";
+import { Pipeline } from "./types/Pipeline";
 import Modal, { Toast } from "./utils/modal";
 import * as fs from "fs";
 import * as path from "path";
@@ -26,6 +27,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private _gitWatch: GitWatch;
   private _pipelineTimer?: NodeJS.Timeout;
   private _pipelineInitialTimer?: NodeJS.Timeout;
+  // 缓存上次推送数据的序列化结果，未变化则跳过 postMessage 避免 webview 重渲染
+  private _lastPostHash: Record<string, string> = {};
+  // 跟踪 pipeline 真实状态，仅在翻转为 failed 时通知一次（不随 webview 重建重置）
+  private _lastPipelineStatus?: string;
   constructor(
     extensionUri: vscode.Uri,
     gitlabService: GitlabService,
@@ -255,6 +260,62 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     this.startPipelineTimer();
   }
 
+  /**
+   * 切分支：QuickPick 列出本地+远程分支，首项可复制当前分支名
+   * 选中非当前分支则 checkout（未提交改动会被拦截）
+   */
+  public async switchBranch() {
+    try {
+      const currentBranch = await this._gitlabService.getCurrentBranch();
+      const branches = await this._gitlabService.getLocalAndRemoteBranches();
+
+      type Item = vscode.QuickPickItem & {
+        action?: "copy";
+        branch?: string;
+        isRemote?: boolean;
+      };
+      const items: Item[] = [
+        { label: "$(copy) 复制当前分支名", action: "copy" },
+        { label: "", kind: vscode.QuickPickItemKind.Separator },
+        ...branches.map(
+          (b): Item => ({
+            label: b.isCurrent ? `$(check) ${b.name}` : b.name,
+            description: b.isCurrent ? "当前" : b.isRemote ? "远程" : "",
+            branch: b.name,
+            isRemote: b.isRemote,
+          })
+        ),
+      ];
+
+      const selected = await vscode.window.showQuickPick(items, {
+        title: "切换分支",
+        placeHolder: `当前分支: ${currentBranch}`,
+      });
+      if (!selected) {
+        return;
+      }
+
+      if (selected.action === "copy") {
+        vscode.env.clipboard.writeText(currentBranch);
+        Toast.info(`分支名 "${currentBranch}" 已复制到剪贴板`);
+        return;
+      }
+
+      if (!selected.branch || selected.branch === currentBranch) {
+        return;
+      }
+
+      await this._gitlabService.checkoutBranch(
+        selected.branch,
+        Boolean(selected.isRemote)
+      );
+      Toast.info(`已切换到分支: ${selected.branch}`);
+      await this.refresh();
+    } catch (error: any) {
+      Toast.error(error.message || "切换分支失败");
+    }
+  }
+
   public async selectTargetProject() {
     const selectedFolder = await this._gitlabService.selectTargetProject();
     if (!selectedFolder) {
@@ -300,6 +361,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           vscode.env.clipboard.writeText(data.content);
           Toast.info(`分支名 "${data.content}" 已复制到剪贴板`);
           break;
+        case "switchBranch":
+          this.switchBranch();
+          break;
         case "publishToProd":
           this.publishToProd();
           break;
@@ -311,6 +375,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           break;
         case "batchMerge":
           this.batchMerge();
+          break;
+        case "retryPipeline":
+          this.retryPipeline(data.pipelineId);
           break;
         case "selectTargetProject":
           try {
@@ -409,11 +476,11 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     // 第一次延迟2秒，然后每5秒更新一次
     this._pipelineInitialTimer = setTimeout(async () => {
       await this.updatePipelineAndTagStatus();
-      
-      // 设置定时器，每5秒更新一次
+
+      // 设置定时器，每15秒更新一次（原5秒过于激进，每分钟约48个API请求）
       this._pipelineTimer = setInterval(async () => {
         await this.updatePipelineAndTagStatus();
-      }, 5000);
+      }, 15000);
     }, 2000);
   }
 
@@ -428,38 +495,47 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
-  private async updatePipelineAndTagStatus() {
+  /**
+   * 数据相比上次未变化则跳过 postMessage，减少 webview 无谓重渲染
+   */
+  private postIfChanged(key: string, message: Record<string, any>) {
     if (!this._view) {
-      console.log('Pipeline and tag update skipped: No view available');
       return;
     }
-    
+    const hash = JSON.stringify(message);
+    if (this._lastPostHash[key] === hash) {
+      return;
+    }
+    this._lastPostHash[key] = hash;
+    this._view.webview.postMessage(message);
+  }
+
+  private async updatePipelineAndTagStatus() {
+    if (!this._view) {
+      return;
+    }
+
     try {
-      console.log('Starting pipeline and tag status update...');
       const projectInfo = await this._gitlabService.getProjectInfo();
-      // const currentBranch = await this._gitlabService.getCurrentBranch();
-      
+
       if (!projectInfo.id) {
-        console.log('Pipeline and tag update skipped: No project ID');
         return;
       }
 
-      // 获取最新的pipeline状态
-      const latestPipeline = await this._gitlabService.getLatestPipeline(projectInfo.id);
-      
-      // 获取最新的tag
-      const latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
+      // pipeline / tag / 活跃MR 互不依赖，并行请求（原串行每次4个await）
+      const [latestPipeline, latestTag, activeMergeRequests] = await Promise.all([
+        this._gitlabService.getLatestPipeline(projectInfo.id),
+        this._gitlabService.getLatestTag(projectInfo.id),
+        this._gitlabService
+          .getMergeRequests(projectInfo.id)
+          .then((allMRs) => allMRs.filter((mr) => mr.state === "opened"))
+          .catch((e) => {
+            console.error("获取活跃MR失败:", e);
+            return [] as any[];
+          }),
+      ]);
 
-      // 获取活跃的merge requests
-      let activeMergeRequests: any[] = [];
-      try {
-        const allMRs = await this._gitlabService.getMergeRequests(projectInfo.id);
-        activeMergeRequests = allMRs.filter((mr) => mr.state === "opened");
-      } catch (e) {
-        console.error('获取活跃MR失败:', e);
-      }
-
-      // 获取已合并到 pipeline ref 的 MR
+      // 已合并MR依赖 pipeline.ref，需在 pipeline resolve 后请求
       let pipelineMergedMRs: any[] = [];
       if (latestPipeline?.ref) {
         try {
@@ -468,35 +544,67 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
             latestPipeline.ref
           );
         } catch (e) {
-          console.error('获取Pipeline已合并MR失败:', e);
+          console.error("获取Pipeline已合并MR失败:", e);
         }
       }
-      
-      // 发送pipeline状态更新
-      this._view.webview.postMessage({ 
-        type: "pipeline_status", 
-        pipeline: latestPipeline 
-      });
 
-      // 发送tag状态更新
-      this._view.webview.postMessage({ 
-        type: "tag_status", 
-        tag: latestTag 
-      });
+      // 状态翻转为 failed 时通知一次（同一失败 pipeline 不重复骚扰）
+      if (
+        latestPipeline?.status === "failed" &&
+        this._lastPipelineStatus !== "failed"
+      ) {
+        void this.notifyPipelineFailed(latestPipeline);
+      }
+      this._lastPipelineStatus = latestPipeline?.status;
 
-      // 发送活跃MR更新
-      this._view.webview.postMessage({
+      this.postIfChanged("pipeline_status", {
+        type: "pipeline_status",
+        pipeline: latestPipeline,
+      });
+      this.postIfChanged("tag_status", { type: "tag_status", tag: latestTag });
+      this.postIfChanged("active_merge_requests", {
         type: "active_merge_requests",
         mergeRequests: activeMergeRequests,
       });
-
-      // 发送Pipeline已合并MR更新
-      this._view.webview.postMessage({
+      this.postIfChanged("pipeline_merged_mrs", {
         type: "pipeline_merged_mrs",
         mergeRequests: pipelineMergedMRs,
       });
     } catch (error) {
-      console.error('更新pipeline和tag状态失败:', error);
+      console.error("更新pipeline和tag状态失败:", error);
+    }
+  }
+
+  /**
+   * Pipeline 失败通知：提供重跑失败 Job / 查看详情两个操作
+   */
+  private async notifyPipelineFailed(pipeline: Pipeline) {
+    const action = await Toast.error(
+      `Pipeline 失败: ${pipeline.ref}`,
+      "重跑失败Job",
+      "查看详情"
+    );
+    if (action === "重跑失败Job") {
+      await this.retryPipeline(pipeline.id);
+    } else if (action === "查看详情" && pipeline.web_url) {
+      vscode.env.openExternal(vscode.Uri.parse(pipeline.web_url));
+    }
+  }
+
+  /**
+   * 重跑指定 pipeline 的失败 Job，并立即刷新状态
+   */
+  public async retryPipeline(pipelineId: number) {
+    try {
+      const projectInfo = await this._gitlabService.getProjectInfo();
+      if (!projectInfo.id) {
+        throw new Error("获取项目信息失败");
+      }
+      await this._gitlabService.retryPipeline(projectInfo.id, pipelineId);
+      Toast.info("已触发重跑");
+      await this.updatePipelineAndTagStatus();
+    } catch (error: any) {
+      Toast.error(error.message || "重跑 pipeline 失败");
     }
   }
 
@@ -519,6 +627,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     if (!this._view) {
       return;
     }
+
+    // 重建 webview HTML 会重置其内部状态，清空缓存以便定时器能重新推送数据
+    this._lastPostHash = {};
 
     const projectInfo = await this._gitlabService.getProjectInfo();
     const currentBranch = await this._gitlabService.getCurrentBranch();
@@ -573,6 +684,13 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     // 获取所有工作区项目列表（用于多项目Tab）
     const workspaceTabs = await this._gitlabService.getAllWorkspaceProjectInfos();
 
+    // 各环境目标分支名，用于按钮下展示（如 TEST/dev、CN/master-cn、COM/release）
+    const [testBranch, cnBranch, comBranch] = await Promise.all([
+      this._gitlabService.getTestBranch().catch(() => ""),
+      this._gitlabService.findCnBranch(projectInfo.id).catch(() => ""),
+      this._gitlabService.findProdBranch(projectInfo.id).catch(() => ""),
+    ]);
+
     const __INITIAL_STATE__ = {
       projectInfo,
       currentBranch,
@@ -583,6 +701,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       workspaceTabs,
       activeMergeRequests,
       pipelineMergedMRs,
+      envBranches: { test: testBranch, cn: cnBranch, com: comBranch },
     };
 
     const indexTemplate = fs.readFileSync(

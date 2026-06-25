@@ -2,16 +2,10 @@ import * as vscode from "vscode";
 
 export default class GitWatch {
   private afterFns: Array<() => void> = [];
-  private watcher: vscode.FileSystemWatcher | undefined;
+  private watchers: vscode.FileSystemWatcher[] = [];
   private debounceTimer: NodeJS.Timeout | undefined;
   private readonly debounceDelay = 300;
   private readonly maxCallbacks = 10; // 限制最大回调数量
-  private readonly ignoredPathRegex =
-    /\.(git|node_modules|dist|build)[\\/]|[\\/]\.(git|node_modules|dist|build)[\\/]/;
-
-  private isIgnoredPath(uri: vscode.Uri): boolean {
-    return this.ignoredPathRegex.test(uri.fsPath);
-  }
 
   public add(fn: () => void) {
     // 检查是否已存在相同函数，避免重复添加
@@ -48,32 +42,35 @@ export default class GitWatch {
   }
 
   constructor() {
-    // 只监听特定文件类型，减少内存占用
-    this.watcher = vscode.workspace.createFileSystemWatcher(
-      "**/*.{ts,js,json,md,yml,yaml,tsx,jsx,css,less,html,vue}",
-      false, // 不忽略创建事件
-      false, // 不忽略修改事件
-      false // 不忽略删除事件
-    );
+    // 只监听 git 元数据：分支切换写 .git/HEAD、合并写 MERGE_HEAD、submodule 变更写 .gitmodules
+    // 不再监听源码文件，避免普通保存触发 webview 重建 + 多个 API 请求
+    const patterns = ["**/.git/HEAD", "**/.git/MERGE_HEAD", "**/.gitmodules"];
 
-    const handleFileChange = (uri: vscode.Uri) => {
-      if (this.isIgnoredPath(uri)) {
-        return;
-      }
+    const handleFileChange = () => {
       this.runAfterFns();
     };
 
-    this.watcher.onDidChange(handleFileChange);
-    this.watcher.onDidCreate(handleFileChange);
-    this.watcher.onDidDelete(handleFileChange);
+    for (const pattern of patterns) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        pattern,
+        false,
+        false,
+        false
+      );
+      watcher.onDidChange(handleFileChange);
+      watcher.onDidCreate(handleFileChange);
+      watcher.onDidDelete(handleFileChange);
+      this.watchers.push(watcher);
+    }
   }
 
   public dispose() {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
-    if (this.watcher) {
-      this.watcher.dispose();
+    for (const watcher of this.watchers) {
+      watcher.dispose();
     }
+    this.watchers = [];
   }
 }

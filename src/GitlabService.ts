@@ -18,6 +18,7 @@ export class GitlabService {
   private readonly token: string;
   public testBranchNames = new Map<string, string>();
   public projectInfos = new Map<string, Project>();
+  private projectNames = new Map<string, string>();
   private selectedWorkspaceRootPath: string | null = null;
 
   constructor() {
@@ -186,55 +187,58 @@ export class GitlabService {
         return [];
       }
 
-      const submodules: Array<{
-        name: string;
-        path: string;
-        branch: string;
-        url: string;
-      }> = [];
       const moduleNames = stdout
         .trim()
         .split("\n")
         .map((line) => line.split(".")[1])
         .filter((name, index, arr) => arr.indexOf(name) === index);
 
-      for (const moduleName of moduleNames) {
-        try {
-          const { stdout: subPath } = await execAsync(
-            `git config --file .gitmodules --get submodule.${moduleName}.path`,
-            { cwd: workspacePath }
-          );
-          const { stdout: subUrl } = await execAsync(
-            `git config --file .gitmodules --get submodule.${moduleName}.url`,
-            { cwd: workspacePath }
-          );
-
-          const submodulePath = subPath.trim();
-          const fullPath = path.join(workspacePath, submodulePath);
-
-          let branch = "N/A";
+      // 各 submodule 的 path/url/branch 查询并行，减少串行子进程开销
+      const submodules = await Promise.all(
+        moduleNames.map(async (moduleName) => {
           try {
-            const { stdout: subBranch } = await execAsync(
-              "git rev-parse --abbrev-ref HEAD",
-              { cwd: fullPath }
-            );
-            branch = subBranch.trim();
-          } catch {
-            // submodule 未初始化
+            const [{ stdout: subPath }, { stdout: subUrl }] = await Promise.all([
+              execAsync(
+                `git config --file .gitmodules --get submodule.${moduleName}.path`,
+                { cwd: workspacePath }
+              ),
+              execAsync(
+                `git config --file .gitmodules --get submodule.${moduleName}.url`,
+                { cwd: workspacePath }
+              ),
+            ]);
+
+            const submodulePath = subPath.trim();
+            const fullPath = path.join(workspacePath, submodulePath);
+
+            let branch = "N/A";
+            try {
+              const { stdout: subBranch } = await execAsync(
+                "git rev-parse --abbrev-ref HEAD",
+                { cwd: fullPath }
+              );
+              branch = subBranch.trim();
+            } catch {
+              // submodule 未初始化
+            }
+
+            return {
+              name: moduleName,
+              path: submodulePath,
+              branch,
+              url: subUrl.trim(),
+            };
+          } catch (err) {
+            console.error(`Failed to get submodule info for ${moduleName}:`, err);
+            return null;
           }
+        })
+      );
 
-          submodules.push({
-            name: moduleName,
-            path: submodulePath,
-            branch,
-            url: subUrl.trim(),
-          });
-        } catch (err) {
-          console.error(`Failed to get submodule info for ${moduleName}:`, err);
-        }
-      }
-
-      return submodules;
+      return submodules.filter(
+        (s): s is { name: string; path: string; branch: string; url: string } =>
+          s !== null
+      );
     } catch (err) {
       return [];
     }
@@ -255,59 +259,62 @@ export class GitlabService {
   > {
     const workspaceFolders = vscode.workspace.workspaceFolders || [];
     const currentPath = this.getCurrentWorkspaceRootPath();
-    const results: Array<{
+    type Info = {
       name: string;
       branch: string;
       fsPath: string;
       isActive: boolean;
       isSubmodule?: boolean;
-    }> = [];
+    };
 
-    // 添加工作区项目
-    for (const folder of workspaceFolders) {
-      try {
-        const { stdout: branch } = await execAsync(
-          "git rev-parse --abbrev-ref HEAD",
-          { cwd: folder.uri.fsPath }
-        );
-        results.push({
-          name: folder.name,
-          branch: branch.trim(),
-          fsPath: folder.uri.fsPath,
-          isActive: folder.uri.fsPath === currentPath,
-        });
-      } catch {
-        results.push({
-          name: folder.name,
-          branch: "N/A",
-          fsPath: folder.uri.fsPath,
-          isActive: folder.uri.fsPath === currentPath,
-        });
-      }
-    }
+    // 工作区分支查询与 submodule 读取按 folder 并行，避免串行 spawn 进程线性叠加
+    const perFolder = await Promise.all(
+      workspaceFolders.map(async (folder): Promise<Info[]> => {
+        const folderResults: Info[] = [];
 
-    // 添加 submodule（遍历所有工作区，每个工作区独立读取其 submodule）
-    for (const folder of workspaceFolders) {
-      try {
-        const submodules = await this.getSubmodulesForWorkspace(
-          folder.uri.fsPath
-        );
-        for (const submodule of submodules) {
-          const submodulePath = path.join(folder.uri.fsPath, submodule.path);
-          results.push({
-            name: submodule.name,
-            branch: submodule.branch,
-            fsPath: submodulePath,
-            isActive: submodulePath === currentPath,
-            isSubmodule: true,
+        try {
+          const { stdout: branch } = await execAsync(
+            "git rev-parse --abbrev-ref HEAD",
+            { cwd: folder.uri.fsPath }
+          );
+          folderResults.push({
+            name: folder.name,
+            branch: branch.trim(),
+            fsPath: folder.uri.fsPath,
+            isActive: folder.uri.fsPath === currentPath,
+          });
+        } catch {
+          folderResults.push({
+            name: folder.name,
+            branch: "N/A",
+            fsPath: folder.uri.fsPath,
+            isActive: folder.uri.fsPath === currentPath,
           });
         }
-      } catch (err) {
-        console.error(`Failed to get submodules for ${folder.name}:`, err);
-      }
-    }
 
-    return results;
+        try {
+          const submodules = await this.getSubmodulesForWorkspace(
+            folder.uri.fsPath
+          );
+          for (const submodule of submodules) {
+            const submodulePath = path.join(folder.uri.fsPath, submodule.path);
+            folderResults.push({
+              name: submodule.name,
+              branch: submodule.branch,
+              fsPath: submodulePath,
+              isActive: submodulePath === currentPath,
+              isSubmodule: true,
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to get submodules for ${folder.name}:`, err);
+        }
+
+        return folderResults;
+      })
+    );
+
+    return perFolder.flat();
   }
 
   async getProjectInfo(): Promise<Project> {
@@ -335,12 +342,19 @@ export class GitlabService {
   }
 
   async getCurrentProjectName() {
+    // 项目名在同一工作区内基本不变，缓存避免反复 spawn git 子进程
+    const workspaceKey = this.getCurrentWorkspaceKey();
+    const cached = this.projectNames.get(workspaceKey);
+    if (cached) {
+      return cached;
+    }
     // 获取远程仓库URL并提取项目名
     const remoteUrl = await this.execCommand(
       "git config --get remote.origin.url"
     );
     const projectName =
       remoteUrl.split("/").pop()?.replace(".git", "") || "Unknown Project";
+    this.projectNames.set(workspaceKey, projectName);
     return projectName;
   }
 
@@ -351,6 +365,56 @@ export class GitlabService {
       console.error("获取当前分支失败:", error);
       return "未知分支";
     }
+  }
+
+  /**
+   * 获取本地 + 远程分支列表，远程同名已存在本地的去重，过滤 origin/HEAD
+   */
+  async getLocalAndRemoteBranches(): Promise<
+    Array<{ name: string; isRemote: boolean; isCurrent: boolean }>
+  > {
+    const current = await this.getCurrentBranch();
+    const stdout = await this.execCommand(
+      "git branch -a --format='%(refname:short)'"
+    );
+    const seen = new Set<string>();
+    const result: Array<{
+      name: string;
+      isRemote: boolean;
+      isCurrent: boolean;
+    }> = [];
+
+    for (const raw of stdout.split("\n")) {
+      const line = raw.trim().replace(/^'|'$/g, "");
+      if (!line || line.includes("HEAD")) {
+        continue;
+      }
+      const isRemote = line.startsWith("origin/");
+      const name = isRemote ? line.slice("origin/".length) : line;
+      if (!name || seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      result.push({ name, isRemote, isCurrent: name === current });
+    }
+    return result;
+  }
+
+  /**
+   * 切换分支：切换前拦截未提交改动；远程分支自动建本地跟踪分支
+   */
+  async checkoutBranch(branch: string, isRemote: boolean): Promise<void> {
+    await this.checkStatusNoCommit();
+    if (isRemote) {
+      try {
+        await this.execCommand(`git checkout ${branch}`);
+        return;
+      } catch {
+        await this.execCommand(`git checkout -b ${branch} origin/${branch}`);
+        return;
+      }
+    }
+    await this.execCommand(`git checkout ${branch}`);
   }
 
   async hasUnMergedRequest(
@@ -585,8 +649,10 @@ export class GitlabService {
     mergeCallback?: (mergeRequest: MergeResponse) => void;
   } = {}): Promise<MergeResponse> {
     const testBranch = await this.getTestBranch();
+    // userForce=true 跳过合并确认弹窗（测试环境无需二次确认）
     const { projectId, mergeRequestResponse } = await this.applyMergeRequest(
-      testBranch
+      testBranch,
+      true
     );
     mergeCallback?.(mergeRequestResponse);
     await this.acceptMergeRequest(projectId, mergeRequestResponse.iid);
@@ -696,6 +762,30 @@ export class GitlabService {
 
     const data = await response.json();
     return data as Pipeline[];
+  }
+
+  /**
+   * 重跑 pipeline：仅重跑失败/取消的 job，复用已成功阶段
+   * 参照 acceptMergeRequest 的 Private-Token 写法
+   */
+  async retryPipeline(
+    projectId: number,
+    pipelineId: number
+  ): Promise<Pipeline> {
+    const apiUrl = `${this.baseUrl}/api/v4/projects/${projectId}/pipelines/${pipelineId}/retry`;
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Private-Token": this.token,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`重跑pipeline失败: ${response.statusText}`);
+    }
+
+    return (await response.json()) as Pipeline;
   }
 
   async getLatestPipeline(projectId: number, ref?: string): Promise<Pipeline | null> {

@@ -39,6 +39,11 @@
       <circle cx="6" cy="6" r="3"/>
       <path d="M6 21V9a9 9 0 0 0 9 9"/>
     </symbol>
+    <symbol id="i-projects" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
+      <path d="M2 12.5l8.58 3.9a2 2 0 0 0 1.66 0L20.83 12.5"/>
+      <path d="M2 17l8.58 3.9a2 2 0 0 0 1.66 0L20.83 17"/>
+    </symbol>
     <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
       <circle cx="12" cy="7" r="4"/>
@@ -55,30 +60,9 @@
   </defs>
 </svg>
 
-<div id="app" class="container" :class="{ 'has-sidebar': state.workspaceTabs && state.workspaceTabs.length > 1 }">
+<div id="app" class="container">
   <!-- 顶部进度条 -->
   <div class="tab-loading-bar" v-if="tabSwitching"></div>
-
-  <aside class="workspace-tabs" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
-    <div
-      class="workspace-tab"
-      :class="{ 'workspace-tab-active': tab.isActive, 'workspace-tab-loading': switchingTabPath === tab.fsPath }"
-      v-for="tab in state.workspaceTabs"
-      :key="tab.fsPath"
-      @click="switchProject(tab)"
-      @mouseenter="showTabTooltip($event, tab)"
-      @mouseleave="hideTabTooltip()"
-    >
-      <span class="workspace-tab-abbr workspace-tab-abbr-short">{{ getTabAbbr(tab.name) }}</span>
-      <span class="workspace-tab-abbr workspace-tab-abbr-long">{{ tab.name }}</span>
-      <span v-if="tab.isSubmodule" class="workspace-tab-badge">SM</span>
-    </div>
-  </aside>
-
-  <!-- Tab 全局 Tooltip -->
-  <div class="tab-tooltip" v-if="tabTooltip.visible" :style="{ top: tabTooltip.top + 'px', left: tabTooltip.left + 'px' }">
-    {{ tabTooltip.text }}
-  </div>
 
   <!-- 主内容区 -->
   <div class="workspace-main">
@@ -128,18 +112,40 @@
   <header class="app-header">
     <div class="project-title">
       <h3>{{state.projectInfo.name}}</h3>
-      <div class="branch-badge" @click="copyBranch" title="点击复制分支名">{{state.currentBranch}}</div>
+
+      <!-- 多项目切换：项目名右侧图标 + 悬浮下拉，仅多项目时显示 -->
+      <div class="ws-switcher" v-if="state.workspaceTabs && state.workspaceTabs.length > 1">
+        <button class="ws-switcher-trigger" title="切换项目">
+          <svg class="icon" aria-hidden="true"><use href="#i-projects"/></svg>
+          <span class="ws-switcher-count">{{ state.workspaceTabs.length }}</span>
+        </button>
+        <div class="ws-dropdown">
+          <div
+            class="ws-dropdown-item"
+            :class="{ 'ws-dropdown-item-active': tab.isActive, 'ws-dropdown-item-loading': switchingTabPath === tab.fsPath }"
+            v-for="tab in state.workspaceTabs"
+            :key="tab.fsPath"
+            @click="switchProject(tab)"
+            :title="getWorkspaceTabTitle(tab)"
+          >
+            <span class="ws-dropdown-name">{{ tab.name }}</span>
+            <span v-if="tab.isSubmodule" class="ws-dropdown-badge">SM</span>
+            <span class="ws-dropdown-branch">{{ tab.branch }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 一键批量合并：图标按钮，紧跟切换项目图标 -->
+      <button class="header-icon-btn" @click="vsPostMsg({ command: 'batchMerge' })" title="一键批量合并（多选项目和环境）">
+        <svg class="icon" aria-hidden="true"><use href="#i-git-merge"/></svg>
+      </button>
+
+      <div class="branch-badge" @click="vsPostMsg({ command: 'switchBranch' })" title="点击切换分支">{{state.currentBranch}}</div>
     </div>
     <p v-if="state.projectInfo.description" class="project-description">
       {{state.projectInfo.description}}
     </p>
   </header>
-
-  <!-- 一键批量合并：多选项目+环境，需求来源 6.11调整 第1次提交 -->
-  <button class="batch-merge-btn" @click="vsPostMsg({ command: 'batchMerge' })" title="选择多个项目和环境，一键批量合并">
-    <svg class="icon" aria-hidden="true"><use href="#i-git-merge"/></svg>
-    <span>一键批量合并</span>
-  </button>
 
   <!-- 快捷操作区 -->
   <div class="quick-actions">
@@ -147,18 +153,21 @@
       @click="vsPostMsg({ command: 'publishToTest' })" title="发布到测试环境">
       <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-rocket"/></svg>
       <span class="quick-action-title">TEST</span>
+      <span class="quick-action-branch" v-if="state.envBranches && state.envBranches.test">{{ state.envBranches.test }}</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.cn}"
       @click="vsPostMsg({ command: 'publishToCn' })" title="发布到国内生产环境">
       <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-globe"/></svg>
       <span class="quick-action-title">CN</span>
+      <span class="quick-action-branch" v-if="state.envBranches && state.envBranches.cn">{{ state.envBranches.cn }}</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod}"
       @click="vsPostMsg({ command: 'publishToProd' })" title="发布到国际生产环境">
       <svg class="icon quick-action-icon" aria-hidden="true"><use href="#i-globe"/></svg>
       <span class="quick-action-title">COM</span>
+      <span class="quick-action-branch" v-if="state.envBranches && state.envBranches.com">{{ state.envBranches.com }}</span>
     </button>
 
     <button class="quick-action-btn" :class="{'loading': loading.prod || loading.cn}"
@@ -230,6 +239,11 @@
         <span class="pipeline-status-badge" :class="'status-' + pipelineInfo.status">
           {{ pipelineInfo.status.toUpperCase() }}
         </span>
+        <button class="icon-btn" v-if="pipelineInfo.status === 'failed'"
+          @click="vsPostMsg({ command: 'retryPipeline', pipelineId: pipelineInfo.id })"
+          title="重跑失败的 Job">
+          <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
+        </button>
         <a :href="pipelineInfo.web_url" class="icon-btn-link" target="_blank" title="查看Pipeline详情">
           <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg>
         </a>

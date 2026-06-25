@@ -17,6 +17,7 @@ body {
   max-width: 900px;
   margin: 0 auto;
   padding: 12px;
+  position: relative;
 }
 
 /* ========== SVG 图标 ========== */
@@ -204,165 +205,152 @@ body {
 .skeleton-line-wide { width: 75%; }
 .skeleton-line-narrow { width: 45%; }
 
-/* ========== 左侧 Tab 栏 + 主内容 Flex 布局 ========== */
-.container.has-sidebar {
-  display: flex;
-  gap: 0;
-  max-width: none;
-  padding: 0;
-}
-
-.workspace-tabs {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 52px;
-  min-width: 52px;
-  padding: 8px 4px;
-  border-right: 1px solid var(--vscode-widget-border);
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: var(--vscode-sideBar-background);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  /* 修改于260429第3次补充：改为fixed定位，不影响右边布局 */
-  position: fixed;
-  z-index: 999;
-  left: 0;
-  /* 修改于260429：支持展开式tab，width改为动态过渡 */
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), align-items 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* 修改于260429：悬浮时展开tab栏 */
-.workspace-tabs:hover {
-  width: 240px;
-  align-items: stretch;
-  padding: 8px 12px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.workspace-tabs::-webkit-scrollbar {
-  display: none;
-}
-
+/* ========== 多项目切换：左上角图标 + 悬浮下拉 ========== */
 .workspace-main {
   padding: 12px 16px;
   overflow-y: auto;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.container.has-sidebar .workspace-main {
-  flex: 1;
-  min-width: 0;
-  /* 修改于260429第3次补充：添加margin-left以适应fixed的tabs宽度 */
-  margin-left: 52px;
+.ws-switcher {
+  position: relative;
+  z-index: 1000;
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
-/* Tab 项：方块缩写 */
-.workspace-tab {
+.ws-switcher-trigger {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  background: transparent;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  position: relative;
-  width: 100%;
-}
-
-.workspace-tab {
-  width: 36px;
   justify-content: center;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  overflow: visible;
-  flex-wrap: wrap;
-  gap: 2px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-.workspace-tabs:hover .workspace-tab {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 12px;
+.ws-switcher-trigger:hover {
+  background: var(--vscode-list-hoverBackground);
+  border-color: var(--vscode-focusBorder);
 }
 
-.workspace-tab:hover {
-  background: rgba(249, 178, 215, 0.3);
+.ws-switcher-trigger .icon {
+  width: 16px;
+  height: 16px;
 }
 
-.workspace-tab-active {
+.ws-switcher-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #F9B2D7;
+  color: #1e1e1e;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* 下拉面板：默认隐藏，悬浮触发区域时展开 */
+.ws-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--vscode-menu-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+/* 悬浮 trigger 或 dropdown 自身都保持展开，避免缝隙断开 */
+.ws-switcher:hover .ws-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.ws-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.ws-dropdown-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.ws-dropdown-item-active {
   background: #F9B2D7;
 }
 
-.workspace-tab-abbr {
-  font-size: 13px;
-  font-weight: 700;
+.ws-dropdown-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--vscode-foreground);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  user-select: none;
-  /* 修改于260429：支持展开时显示完整名称 */
-  transition: all 0.3s ease;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 修改于260429：默认显示缩写 */
-.workspace-tab-abbr-short {
-  display: block;
-}
-
-.workspace-tab-abbr-long {
-  display: none;
-}
-
-/* 修改于260429：tabs展开时，显示完整名称 */
-.workspace-tabs:hover .workspace-tab-abbr-short {
-  display: none;
-}
-
-.workspace-tabs:hover .workspace-tab-abbr-long {
-  display: block;
-  text-transform: none;
-  letter-spacing: normal;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.workspace-tab-active .workspace-tab-abbr {
+.ws-dropdown-item-active .ws-dropdown-name,
+.ws-dropdown-item-active .ws-dropdown-branch {
   color: #1e1e1e;
 }
 
-.workspace-tab-badge {
+.ws-dropdown-badge {
+  flex-shrink: 0;
   background: #007acc;
   color: white;
   font-size: 9px;
   font-weight: 700;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 2px;
-  letter-spacing: 0px;
+}
+
+.ws-dropdown-branch {
   flex-shrink: 0;
-  display: none;
+  max-width: 90px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.workspace-tabs:hover .workspace-tab-badge {
-  display: block;
+/* 切换中：内容半透明 + spinner */
+.ws-dropdown-item-loading .ws-dropdown-name,
+.ws-dropdown-item-loading .ws-dropdown-badge,
+.ws-dropdown-item-loading .ws-dropdown-branch {
+  opacity: 0.2;
 }
 
-.workspace-tab-loading .workspace-tab-abbr {
-  opacity: 0.15;
-}
-
-.workspace-tab-loading::after {
+.ws-dropdown-item-loading::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -383,14 +371,6 @@ body {
 @keyframes tab-spin {
   from { transform: translate(-50%, -50%) rotate(0deg); }
   to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-/**
- * 注意：Tab tooltip 已改为展开式tab，不再使用tooltip
- * 需求来源：260429第2次补充 — 展开式tab显示完整名称
- */
-.tab-tooltip {
-  display: none;
 }
 
 /* ========== Header ========== */
@@ -416,6 +396,40 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* 切换/批量合并图标紧跟项目名，分支徽章推到最右 */
+.project-title .branch-badge {
+  margin-left: auto;
+}
+
+/* 标题行图标按钮（批量合并等），样式对齐项目切换图标 */
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.header-icon-btn:hover {
+  background: var(--vscode-list-hoverBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.header-icon-btn .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .branch-badge {
@@ -444,34 +458,6 @@ body {
 }
 
 /* ========== 快捷操作区 ========== */
-/* 一键批量合并按钮，需求来源 6.11调整 第1次提交 */
-.batch-merge-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
-  border: 1px solid var(--vscode-button-background);
-  border-radius: 10px;
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.batch-merge-btn:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-
-.batch-merge-btn .icon {
-  width: 18px;
-  height: 18px;
-}
-
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -521,6 +507,16 @@ body {
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
+}
+
+.quick-action-branch {
+  font-size: 9px;
+  line-height: 1.1;
+  opacity: 0.7;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ========== 通用 Section Card ========== */
