@@ -368,7 +368,36 @@ export class GitlabService {
   }
 
   /**
+   * 解析 reflog 的 checkout 记录，返回分支名按最近切换顺序排列（最近在前，去重）
+   */
+  private async getRecentCheckoutBranches(): Promise<string[]> {
+    try {
+      // %gs = reflog 主题，形如 "checkout: moving from A to B"，B 为切换目标
+      const stdout = await this.execCommand("git reflog --format='%gs'");
+      const order: string[] = [];
+      const seen = new Set<string>();
+      const re = /^checkout: moving from .+ to (.+)$/;
+      for (const raw of stdout.split("\n")) {
+        const m = raw.trim().replace(/^'|'$/g, "").match(re);
+        if (!m) {
+          continue;
+        }
+        const name = m[1].trim();
+        if (!name || seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        order.push(name);
+      }
+      return order;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * 获取本地 + 远程分支列表，远程同名已存在本地的去重，过滤 origin/HEAD
+   * 排序：当前分支最前 -> 按 reflog 最近切换顺序 -> 其余保持原顺序
    */
   async getLocalAndRemoteBranches(): Promise<
     Array<{ name: string; isRemote: boolean; isCurrent: boolean }>
@@ -397,7 +426,22 @@ export class GitlabService {
       seen.add(name);
       result.push({ name, isRemote, isCurrent: name === current });
     }
-    return result;
+
+    // 按 reflog 最近切换顺序排序：当前分支恒最前；命中 reflog 的按其顺序；其余保持原相对顺序
+    const recent = await this.getRecentCheckoutBranches();
+    const rank = new Map<string, number>();
+    recent.forEach((name, i) => rank.set(name, i));
+    return result
+      .map((b, idx) => ({ b, idx }))
+      .sort((a, b) => {
+        if (a.b.isCurrent !== b.b.isCurrent) {
+          return a.b.isCurrent ? -1 : 1;
+        }
+        const ra = rank.has(a.b.name) ? rank.get(a.b.name)! : Infinity;
+        const rb = rank.has(b.b.name) ? rank.get(b.b.name)! : Infinity;
+        return ra !== rb ? ra - rb : a.idx - b.idx;
+      })
+      .map((x) => x.b);
   }
 
   /**
