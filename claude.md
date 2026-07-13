@@ -1,0 +1,1 @@
+每次会话都要review一下，如果没有p0,p1的问题，可以直接将package.json的version版本加1，然后使用vsce publish帮我发布

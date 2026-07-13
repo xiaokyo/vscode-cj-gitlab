@@ -4,6 +4,10 @@ import { PublishEnv, BatchTarget } from "./types/BatchPublish";
 import { Pipeline } from "./types/Pipeline";
 import { Project } from "./types/Project";
 import Modal, { Toast } from "./utils/modal";
+import {
+  formatBatchSummary,
+  BatchSummaryResult,
+} from "./utils/batchSummary";
 import * as fs from "fs";
 import * as path from "path";
 import GitWatch from "./GitWatch";
@@ -231,45 +235,14 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   }
 
   private showBatchSummary(
-    results: Array<{
-      projectName: string;
-      env: PublishEnv;
-      status: string;
-      message: string;
-      warning?: string;
-    }>,
+    results: BatchSummaryResult[],
     copiedCount: number
   ) {
-    const envLabel: Record<string, string> = { test: "TEST", cn: "CN", com: "COM" };
-    const fmt = (r: (typeof results)[number]) =>
-      `${r.projectName} · ${envLabel[r.env]}：${r.message}${
-        r.warning ? `（⚠️ ${r.warning}）` : ""
-      }`;
-    const success = results.filter((r) => r.status === "success");
-    const skipped = results.filter((r) => r.status === "skipped");
-    const failed = results.filter((r) => r.status === "failed");
-
-    const lines: string[] = [
-      `成功 ${success.length} · 跳过 ${skipped.length} · 失败 ${failed.length}`,
-    ];
-    if (copiedCount > 0) {
-      lines.push(`已复制 ${copiedCount} 条 MR 信息到剪贴板`);
-    }
-    if (success.length) {
-      lines.push("", "✅ 成功:", ...success.map(fmt));
-    }
-    if (skipped.length) {
-      lines.push("", "⏭️ 跳过:", ...skipped.map(fmt));
-    }
-    if (failed.length) {
-      lines.push("", "❌ 失败:", ...failed.map(fmt));
-    }
-    const detail = lines.join("\n");
-
-    if (success.length === 0 && failed.length > 0) {
-      Modal.warning("一键批量合并：全部失败", { detail });
+    const { title, detail, level } = formatBatchSummary(results, copiedCount);
+    if (level === "warning") {
+      Modal.warning(title, { detail });
     } else {
-      Modal.info("一键批量合并完成", { detail });
+      Modal.info(title, { detail });
     }
   }
 

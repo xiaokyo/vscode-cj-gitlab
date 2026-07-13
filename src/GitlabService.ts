@@ -11,6 +11,7 @@ import { Tag } from "./types/Tag";
 import { BatchItemResult, BatchTarget, PublishEnv } from "./types/BatchPublish";
 import Modal from "./utils/modal";
 import { hasUncommitted } from "./utils/gitStatus";
+import { isCjRemote } from "./utils/isCjRemote";
 
 const execAsync = promisify(exec);
 
@@ -297,6 +298,19 @@ export class GitlabService {
     const perFolder = await Promise.all(
       workspaceFolders.map(async (folder): Promise<Info[]> => {
         const folderResults: Info[] = [];
+
+        // 非 cj 项目（remote host 不匹配配置的 GitLab）不纳入列表
+        try {
+          const { stdout: remoteUrl } = await execAsync(
+            "git config --get remote.origin.url",
+            { cwd: folder.uri.fsPath }
+          );
+          if (!isCjRemote(remoteUrl.trim(), this.baseUrl)) {
+            return folderResults;
+          }
+        } catch {
+          return folderResults;
+        }
 
         try {
           const { stdout: branch } = await execAsync(
