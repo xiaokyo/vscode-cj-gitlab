@@ -10,6 +10,7 @@ import { Pipeline } from "./types/Pipeline";
 import { Tag } from "./types/Tag";
 import { BatchItemResult, BatchTarget, PublishEnv } from "./types/BatchPublish";
 import Modal from "./utils/modal";
+import { hasUncommitted } from "./utils/gitStatus";
 
 const execAsync = promisify(exec);
 
@@ -774,6 +775,15 @@ export class GitlabService {
     }
   }
 
+  /** 非阻塞脏检查：出错按干净处理，不影响发布流程 */
+  async hasUncommitted(): Promise<boolean> {
+    try {
+      return hasUncommitted(await this.execCommand("git status --porcelain"));
+    } catch {
+      return false;
+    }
+  }
+
   async getNoCommitFiles() {
     const status = await this.execCommand("git status --porcelain");
     const files = status.split("\n").map((line) => line.trim().split(" ")[1]);
@@ -946,26 +956,11 @@ export class GitlabService {
         index: -1,
       } as vscode.WorkspaceFolder);
 
-      let dirty = false;
-      try {
-        await this.checkStatusNoCommit();
-      } catch (err: any) {
-        dirty = true;
-      }
+      // 非阻塞提示：脏工作区仅标注，合并照常进行
+      const dirty = await this.hasUncommitted();
 
       for (const env of envs) {
         onProgress?.(done, total, `${target.name} · ${env.toUpperCase()}`);
-        if (dirty) {
-          results.push({
-            projectName: target.name,
-            fsPath: target.fsPath,
-            env,
-            status: "skipped",
-            message: "有未提交的文件，已跳过",
-          });
-          done++;
-          continue;
-        }
         try {
           const mr = await this.publishEnv(env);
           const item: BatchItemResult = {
@@ -975,6 +970,7 @@ export class GitlabService {
             status: "success",
             message: env === "test" ? "已自动合并" : "已创建合并请求",
             webUrl: mr.web_url,
+            warning: dirty ? "有未提交改动，未包含在本次合并" : undefined,
           };
           if (env !== "test") {
             item.mergeInfo = await this.buildMergeInfo(env, mr.web_url);

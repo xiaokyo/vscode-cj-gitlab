@@ -10,6 +10,8 @@ export interface BatchItemResult {
   message: string;
   mergeInfo?: string;
   webUrl?: string;
+  /** 有未提交改动时的非阻塞提示，合并照常进行 */
+  warning?: string;
 }
 
 export interface BatchTarget {

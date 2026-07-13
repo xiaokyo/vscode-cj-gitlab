@@ -120,10 +120,17 @@
           <span class="ws-switcher-count">{{ state.workspaceTabs.length }}</span>
         </button>
         <div class="ws-dropdown">
+          <input
+            class="ws-dropdown-search"
+            v-model="projectSearchKeyword"
+            placeholder="搜索项目 / 分支..."
+            @click.stop
+            @keydown.stop
+          />
           <div
             class="ws-dropdown-item"
             :class="{ 'ws-dropdown-item-active': tab.isActive, 'ws-dropdown-item-loading': switchingTabPath === tab.fsPath }"
-            v-for="tab in state.workspaceTabs"
+            v-for="tab in filteredWorkspaceTabs"
             :key="tab.fsPath"
             @click="switchProject(tab)"
             :title="getWorkspaceTabTitle(tab)"
@@ -132,6 +139,7 @@
             <span v-if="tab.isSubmodule" class="ws-dropdown-badge">SM</span>
             <span class="ws-dropdown-branch">{{ tab.branch }}</span>
           </div>
+          <div v-if="filteredWorkspaceTabs.length === 0" class="ws-dropdown-empty">无匹配项目</div>
         </div>
       </div>
 

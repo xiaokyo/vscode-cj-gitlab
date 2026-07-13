@@ -16,6 +16,22 @@ const FILE_EXTENSIONS = [
 
 const INDEX_FILE_REGEX = new RegExp(`/index\\.(${FILE_EXTENSIONS.join('|')})$`);
 
+/** 按名称/分支大小写不敏感包含过滤；空关键字返回全部。与 src/utils/tabFilter.ts 逻辑一致 */
+function filterWorkspaceTabs(tabs, keyword) {
+  if (!Array.isArray(tabs)) {
+    return [];
+  }
+  const kw = (keyword || '').trim().toLowerCase();
+  if (!kw) {
+    return tabs;
+  }
+  return tabs.filter(
+    (t) =>
+      (t.name || '').toLowerCase().includes(kw) ||
+      (t.branch || '').toLowerCase().includes(kw)
+  );
+}
+
 new Vue({
   el: "#app",
   data() {
@@ -33,6 +49,7 @@ new Vue({
       pipelineMergedMRs: __INITIAL_DATA__.pipelineMergedMRs || [],
       tabSwitching: false,
       switchingTabPath: '',
+      projectSearchKeyword: '',
       tabTooltip: { visible: false, text: '', top: 0, left: 0 },
       /* 修改于260429第2次补充：添加tabs展开状态 */
       tabsExpanded: false,
@@ -227,6 +244,15 @@ new Vue({
           case "pipeline_merged_mrs":
             this.pipelineMergedMRs = data.mergeRequests || [];
             break;
+          case "stash_files":
+            this.$set(this.state, 'stashFiles', data.stashFiles || []);
+            break;
+          case "workspace_tabs":
+            this.$set(this.state, 'workspaceTabs', data.workspaceTabs || []);
+            break;
+          case "env_branches":
+            this.$set(this.state, 'envBranches', data.envBranches || {});
+            break;
           default:
             break;
         }
@@ -244,6 +270,10 @@ new Vue({
      */
     workspaceTabsOrdered() {
       return this.state.workspaceTabs || [];
+    },
+    /** 按搜索关键字过滤后的项目列表 */
+    filteredWorkspaceTabs() {
+      return filterWorkspaceTabs(this.state.workspaceTabs, this.projectSearchKeyword);
     },
   },
 });

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { GitlabService } from "./GitlabService";
 import { PublishEnv, BatchTarget } from "./types/BatchPublish";
 import { Pipeline } from "./types/Pipeline";
+import { Project } from "./types/Project";
 import Modal, { Toast } from "./utils/modal";
 import * as fs from "fs";
 import * as path from "path";
@@ -31,6 +32,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private _lastPostHash: Record<string, string> = {};
   // 跟踪 pipeline 真实状态，仅在翻转为 failed 时通知一次（不随 webview 重建重置）
   private _lastPipelineStatus?: string;
+  // 按工作区缓存上次的 __INITIAL_STATE__，切换项目时秒开占位，后台再刷新覆盖
+  private _stateCache = new Map<string, any>();
   constructor(
     extensionUri: vscode.Uri,
     gitlabService: GitlabService,
@@ -42,10 +45,17 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     this.debouncedUpdateContent = debounce(this.updateContent.bind(this), 300);
   }
 
+  /** 发布前非阻塞提示：有未提交改动仅警告，不拦截流程 */
+  private async warnIfUncommitted() {
+    if (await this._gitlabService.hasUncommitted()) {
+      Toast.warning("有未提交的文件，发布不会包含这些改动");
+    }
+  }
+
   public async publishToTest() {
     this.setLoading(true, "test");
     try {
-      await this._gitlabService.checkStatusNoCommit();
+      void this.warnIfUncommitted();
       await this._gitlabService.publishDevloperEnv({
         mergeCallback: (mergeResponse) => {
           this.setMergeLink(mergeResponse.web_url, "test");
@@ -59,10 +69,12 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
-  public async publishToProd(userForce = false) {
+  public async publishToProd(userForce = false, skipWarn = false) {
     this.setLoading(true, "prod");
     try {
-      await this._gitlabService.checkStatusNoCommit();
+      if (!skipWarn) {
+        void this.warnIfUncommitted();
+      }
       const projectInfo = await this._gitlabService.getProjectInfo();
       const prodBranchName = await this._gitlabService.findProdBranch(
         projectInfo.id
@@ -79,10 +91,12 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
-  public async publishToCn(userForce = false) {
+  public async publishToCn(userForce = false, skipWarn = false) {
     this.setLoading(true, "cn");
     try {
-      await this._gitlabService.checkStatusNoCommit();
+      if (!skipWarn) {
+        void this.warnIfUncommitted();
+      }
       const projectInfo_cn = await this._gitlabService.getProjectInfo();
       const prodBranchName_cn = await this._gitlabService.findCnBranch(
         projectInfo_cn.id
@@ -115,8 +129,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
   public async getProdAndCnInfo() {
     try {
-      const cnRes = await this.publishToCn(true);
-      const prodRes = await this.publishToProd(true);
+      void this.warnIfUncommitted();
+      const cnRes = await this.publishToCn(true, true);
+      const prodRes = await this.publishToProd(true, true);
       const cnContent = await this.copyLink({
         env: "cn",
         content: cnRes?.web_url || "",
@@ -221,12 +236,15 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       env: PublishEnv;
       status: string;
       message: string;
+      warning?: string;
     }>,
     copiedCount: number
   ) {
     const envLabel: Record<string, string> = { test: "TEST", cn: "CN", com: "COM" };
     const fmt = (r: (typeof results)[number]) =>
-      `${r.projectName} · ${envLabel[r.env]}：${r.message}`;
+      `${r.projectName} · ${envLabel[r.env]}：${r.message}${
+        r.warning ? `（⚠️ ${r.warning}）` : ""
+      }`;
     const success = results.filter((r) => r.status === "success");
     const skipped = results.filter((r) => r.status === "skipped");
     const failed = results.filter((r) => r.status === "failed");
@@ -515,6 +533,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
 
+    // 调用时刻锁定 cacheKey，避免异步 resolve 时工作区已切换导致数据串到别的项目缓存
+    const cacheKey = this._gitlabService.getCurrentWorkspaceRootPath();
+
     try {
       const projectInfo = await this._gitlabService.getProjectInfo();
 
@@ -556,6 +577,21 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         void this.notifyPipelineFailed(latestPipeline);
       }
       this._lastPipelineStatus = latestPipeline?.status;
+
+      // 异步期间已切换到别的工作区则丢弃，避免数据串到别的项目缓存/webview
+      if (this._gitlabService.getCurrentWorkspaceRootPath() !== cacheKey) {
+        return;
+      }
+
+      // 回写缓存，下次切回该工作区可秒开最新数据
+      const cached = this._stateCache.get(cacheKey) || {};
+      this._stateCache.set(cacheKey, {
+        ...cached,
+        latestPipeline,
+        latestTag,
+        activeMergeRequests,
+        pipelineMergedMRs,
+      });
 
       this.postIfChanged("pipeline_status", {
         type: "pipeline_status",
@@ -633,7 +669,6 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
 
     const projectInfo = await this._gitlabService.getProjectInfo();
     const currentBranch = await this._gitlabService.getCurrentBranch();
-    await this._gitlabService.getTestBranch().catch((err) => {});
 
     if (!projectInfo.id) {
       this._view.webview.html = `
@@ -647,20 +682,33 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
 
-    const styleUri = this._view.webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this._extensionUri,
-        "resources",
-        "webview",
-        "styles.css"
-      )
-    );
+    const cacheKey = this._gitlabService.getCurrentWorkspaceRootPath();
+    const cached = this._stateCache.get(cacheKey);
 
-    const scripts = this.getScriptUris();
+    // 命中缓存：用旧数据秒开，projectInfo/currentBranch 用最新，后台异步刷新覆盖
+    if (cached) {
+      const initialState = {
+        ...cached,
+        projectInfo,
+        currentBranch,
+        currentWorkspaceName: this._gitlabService.getCurrentWorkspaceName(),
+      };
+      this.renderWebviewHtml(initialState);
+      void this.updatePipelineAndTagStatus();
+      void this.refreshWorkspaceMeta(cacheKey);
+      return;
+    }
 
+    // 未命中缓存：首次串行拉取完整数据
+    const initialState = await this.buildInitialState(projectInfo, currentBranch);
+    this._stateCache.set(cacheKey, initialState);
+    this.renderWebviewHtml(initialState);
+  }
+
+  /** 首次拉取完整 __INITIAL_STATE__（stash / pipeline / tag / MR / 各环境分支） */
+  private async buildInitialState(projectInfo: Project, currentBranch: string) {
     const stashFiles = await this._gitlabService.getNoCommitFiles();
 
-    // 获取初始的pipeline和tag状态
     let latestPipeline = null;
     let latestTag = null;
     let activeMergeRequests: any[] = [];
@@ -670,7 +718,6 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       latestTag = await this._gitlabService.getLatestTag(projectInfo.id);
       const allMRs = await this._gitlabService.getMergeRequests(projectInfo.id);
       activeMergeRequests = allMRs.filter((mr) => mr.state === "opened");
-      // 获取已合并到 pipeline ref 分支的 MR
       if (latestPipeline?.ref) {
         pipelineMergedMRs = await this._gitlabService.getMergedMergeRequests(
           projectInfo.id,
@@ -678,20 +725,18 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         );
       }
     } catch (error) {
-      console.error('获取初始pipeline、tag和MR状态失败:', error);
+      console.error("获取初始pipeline、tag和MR状态失败:", error);
     }
 
-    // 获取所有工作区项目列表（用于多项目Tab）
     const workspaceTabs = await this._gitlabService.getAllWorkspaceProjectInfos();
 
-    // 各环境目标分支名，用于按钮下展示（如 TEST/dev、CN/master-cn、COM/release）
     const [testBranch, cnBranch, comBranch] = await Promise.all([
       this._gitlabService.getTestBranch().catch(() => ""),
       this._gitlabService.findCnBranch(projectInfo.id).catch(() => ""),
       this._gitlabService.findProdBranch(projectInfo.id).catch(() => ""),
     ]);
 
-    const __INITIAL_STATE__ = {
+    return {
       projectInfo,
       currentBranch,
       currentWorkspaceName: this._gitlabService.getCurrentWorkspaceName(),
@@ -703,14 +748,66 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       pipelineMergedMRs,
       envBranches: { test: testBranch, cn: cnBranch, com: comBranch },
     };
+  }
 
-    const indexTemplate = fs.readFileSync(
-      path.join(
-        this._extensionUri.fsPath,
+  /** 后台刷新工作区列表 / stash / 环境分支，变化则 postMessage，并回写缓存 */
+  private async refreshWorkspaceMeta(cacheKey: string) {
+    try {
+      const projectInfo = await this._gitlabService.getProjectInfo();
+      if (!projectInfo.id) {
+        return;
+      }
+      const [stashFiles, workspaceTabs, testBranch, cnBranch, comBranch] =
+        await Promise.all([
+          this._gitlabService.getNoCommitFiles().catch(() => []),
+          this._gitlabService.getAllWorkspaceProjectInfos().catch(() => []),
+          this._gitlabService.getTestBranch().catch(() => ""),
+          this._gitlabService.findCnBranch(projectInfo.id).catch(() => ""),
+          this._gitlabService.findProdBranch(projectInfo.id).catch(() => ""),
+        ]);
+      // 异步期间已切换到别的工作区则丢弃，避免把本项目数据写进/推送到别的项目
+      if (this._gitlabService.getCurrentWorkspaceRootPath() !== cacheKey) {
+        return;
+      }
+      const cached = this._stateCache.get(cacheKey) || {};
+      this._stateCache.set(cacheKey, {
+        ...cached,
+        stashFiles,
+        workspaceTabs,
+        envBranches: { test: testBranch, cn: cnBranch, com: comBranch },
+      });
+      this.postIfChanged("stash_files", {
+        type: "stash_files",
+        stashFiles,
+      });
+      this.postIfChanged("workspace_tabs", {
+        type: "workspace_tabs",
+        workspaceTabs,
+      });
+      this.postIfChanged("env_branches", {
+        type: "env_branches",
+        envBranches: { test: testBranch, cn: cnBranch, com: comBranch },
+      });
+    } catch (error) {
+      console.error("后台刷新工作区元信息失败:", error);
+    }
+  }
+
+  private renderWebviewHtml(initialState: any) {
+    if (!this._view) {
+      return;
+    }
+    const styleUri = this._view.webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
         "resources",
         "webview",
-        "index.html"
-      ),
+        "styles.css"
+      )
+    );
+    const scripts = this.getScriptUris();
+    const indexTemplate = fs.readFileSync(
+      path.join(this._extensionUri.fsPath, "resources", "webview", "index.html"),
       "utf-8"
     );
 
@@ -725,9 +822,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                   ${indexTemplate}
 
                   <script>
-                     window.__INITIAL_STATE__ = ${JSON.stringify(
-                       __INITIAL_STATE__
-                     )};
+                     window.__INITIAL_STATE__ = ${JSON.stringify(initialState)};
                   </script>
                   <script src="${scripts.main}"></script>
               </body>
