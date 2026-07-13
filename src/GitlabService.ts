@@ -14,6 +14,29 @@ import { hasUncommitted } from "./utils/gitStatus";
 
 const execAsync = promisify(exec);
 
+/** 命令 runner：支持 stdin（git commit -F - 需从 stdin 读 message）；出错时 err.stderr 携带 stderr */
+type CmdRunner = (
+  command: string,
+  opts: { cwd: string; input?: string }
+) => Promise<{ stdout: string; stderr: string }>;
+
+/** 默认 runner：手动包装 exec 以拿到子进程句柄写 stdin（promisify(exec) 拿不到句柄，无法传 input） */
+const defaultRunner: CmdRunner = (command, { cwd, input }) =>
+  new Promise((resolve, reject) => {
+    const child = exec(command, { cwd }, (err, stdout, stderr) => {
+      if (err) {
+        (err as any).stderr = stderr;
+        return reject(err);
+      }
+      resolve({ stdout, stderr });
+    });
+    if (input !== undefined && child.stdin) {
+      // 防止子进程提前关闭 stdin 导致 EPIPE 未捕获崩溃扩展宿主
+      child.stdin.on("error", () => {});
+      child.stdin.end(input);
+    }
+  });
+
 export class GitlabService {
   private readonly baseUrl: string;
   private readonly token: string;
@@ -21,6 +44,8 @@ export class GitlabService {
   public projectInfos = new Map<string, Project>();
   private projectNames = new Map<string, string>();
   private selectedWorkspaceRootPath: string | null = null;
+  // 命令 runner，默认走 defaultRunner；测试可覆写此字段注入替身
+  private run: CmdRunner = defaultRunner;
 
   constructor() {
     const config = vscode.workspace.getConfiguration("cj-gitlab");
@@ -155,7 +180,7 @@ export class GitlabService {
 
   private async execCommand(command: string): Promise<string> {
     try {
-      const { stdout } = await execAsync(command, {
+      const { stdout } = await this.run(command, {
         cwd: this.getCurrentWorkspaceRootPath(),
       });
       return stdout.trim();
@@ -779,6 +804,64 @@ export class GitlabService {
   async hasUncommitted(): Promise<boolean> {
     try {
       return hasUncommitted(await this.execCommand("git status --porcelain"));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 一键提交并推送：add -A → commit(message 经 stdin，防注入) → push(无 upstream 自动降级)
+   * 干净工作区抛「无待提交改动」，由 View 层转友好提示
+   */
+  async commitAndPush(message: string): Promise<void> {
+    if (!message.trim()) {
+      throw new Error("commit message 不能为空");
+    }
+    const cwd = this.getCurrentWorkspaceRootPath();
+    const status = await this.run("git status --porcelain", { cwd });
+    if (!hasUncommitted(status.stdout)) {
+      throw new Error("无待提交改动");
+    }
+    await this.run("git add -A", { cwd });
+
+    // add -A 后确认确有暂存内容（porcelain 脏但 add 无果，如 dirty submodule 指针）
+    let staged = false;
+    try {
+      await this.run("git diff --cached --quiet", { cwd });
+    } catch (err: any) {
+      if (err?.code !== 1) {
+        throw err; // exit≥2 是真错误，非“有暂存差异”
+      }
+      staged = true; // exit 1 = 有暂存差异
+    }
+    if (!staged) {
+      throw new Error("无待提交改动");
+    }
+
+    await this.run("git commit -F -", { cwd, input: message });
+
+    // 先探测 upstream（exit code 判定，不依赖本地化文案）；无则带 --set-upstream 推
+    if (await this.hasUpstream(cwd)) {
+      await this.run("git push", { cwd });
+      return;
+    }
+    // 分支名对同一 cwd 现取，避免异步期间工作区切换取到别的仓库分支
+    const branch = (
+      await this.run("git rev-parse --abbrev-ref HEAD", { cwd })
+    ).stdout.trim();
+    if (!branch || branch === "HEAD") {
+      throw new Error("无法确定当前分支，无法设置 upstream");
+    }
+    await this.run(`git push --set-upstream origin ${branch}`, { cwd });
+  }
+
+  /** 当前分支是否已配置 upstream；@{u} 解析成功即有（与 git 语言无关） */
+  private async hasUpstream(cwd: string): Promise<boolean> {
+    try {
+      await this.run("git rev-parse --abbrev-ref --symbolic-full-name @{u}", {
+        cwd,
+      });
+      return true;
     } catch {
       return false;
     }

@@ -39,6 +39,11 @@
       <circle cx="6" cy="6" r="3"/>
       <path d="M6 21V9a9 9 0 0 0 9 9"/>
     </symbol>
+    <symbol id="i-git-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <line x1="3" x2="9" y1="12" y2="12"/>
+      <line x1="15" x2="21" y1="12" y2="12"/>
+    </symbol>
     <symbol id="i-projects" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
       <path d="M2 12.5l8.58 3.9a2 2 0 0 0 1.66 0L20.83 12.5"/>
@@ -146,6 +151,11 @@
       <!-- 一键批量合并：图标按钮，紧跟切换项目图标 -->
       <button class="header-icon-btn" @click="vsPostMsg({ command: 'batchMerge' })" title="一键批量合并（多选项目和环境）">
         <svg class="icon" aria-hidden="true"><use href="#i-git-merge"/></svg>
+      </button>
+
+      <!-- 一键提交并推送：add -A → commit → push -->
+      <button class="header-icon-btn" @click="commitAndPush" title="一键提交并推送（add -A → commit → push）">
+        <svg class="icon" aria-hidden="true"><use href="#i-git-commit"/></svg>
       </button>
 
       <div class="branch-badge" @click="vsPostMsg({ command: 'switchBranch' })" title="点击切换分支">{{state.currentBranch}}</div>

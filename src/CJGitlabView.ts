@@ -279,6 +279,38 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   }
 
   /**
+   * 一键提交并推送：干净工作区仅提示不弹框；填 message 后 add -A → commit → push
+   */
+  public async commitAndPush() {
+    // 用 hasUncommitted 判定（与 Service 一致，getNoCommitFiles 会漏 staged-only/rename）
+    if (!(await this._gitlabService.hasUncommitted())) {
+      Toast.info("无待提交改动");
+      return;
+    }
+    const message = await vscode.window.showInputBox({
+      prompt: "输入 commit message",
+      placeHolder: "将提交(add -A)并推送全部改动",
+    });
+    if (!message || !message.trim()) {
+      return;
+    }
+    try {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "一键提交并推送",
+          cancellable: false,
+        },
+        () => this._gitlabService.commitAndPush(message)
+      );
+      Toast.info("提交并推送成功");
+      await this.refresh();
+    } catch (err: any) {
+      Toast.error(err?.message || "提交失败");
+    }
+  }
+
+  /**
    * 切分支：QuickPick 列出本地+远程分支，首项可复制当前分支名
    * 选中非当前分支则 checkout（未提交改动会被拦截）
    */
@@ -393,6 +425,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
           break;
         case "batchMerge":
           this.batchMerge();
+          break;
+        case "commitAndPush":
+          this.commitAndPush();
           break;
         case "retryPipeline":
           this.retryPipeline(data.pipelineId);

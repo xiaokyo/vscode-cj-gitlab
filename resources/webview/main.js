@@ -83,10 +83,15 @@ new Vue({
 
     /** 复制分支名 */
     copyBranch() {
-      this.vsPostMsg({ 
-        command: 'copyBranch', 
-        content: this.state.currentBranch 
+      this.vsPostMsg({
+        command: 'copyBranch',
+        content: this.state.currentBranch
       });
+    },
+
+    /** 一键提交并推送 */
+    commitAndPush() {
+      this.vsPostMsg({ command: 'commitAndPush' });
     },
 
     /** 切换工作区项目 */

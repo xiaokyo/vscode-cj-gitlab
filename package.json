@@ -33,6 +33,10 @@
       {
         "command": "cj-gitlab.batchMerge",
         "title": "CJ GitLab: 一键批量合并"
+      },
+      {
+        "command": "cj-gitlab.commitAndPush",
+        "title": "CJ GitLab: 一键提交并推送"
       }
     ],
     "viewsContainers": {

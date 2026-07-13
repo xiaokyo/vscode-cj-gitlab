@@ -49,6 +49,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("cj-gitlab.commitAndPush", () => {
+      provider.commitAndPush();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("cj-gitlab.selectTargetProject", async () => {
       try {
         await provider.selectTargetProject();
