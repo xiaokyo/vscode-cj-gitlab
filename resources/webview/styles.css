@@ -326,7 +326,7 @@ body {
   transition: background 0.15s ease;
 }
 
-.ws-dropdown-item:hover {
+.ws-dropdown-item:hover:not(.ws-dropdown-item-active) {
   background: var(--vscode-list-hoverBackground);
 }
 
