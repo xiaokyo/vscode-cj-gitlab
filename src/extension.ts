@@ -15,6 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
     gitWatch
   );
 
+  // 未配置只提示，不 return——否则命令与 webview 全部不注册，配置后需 reload 才能用
   if (gitlabService.isNotConfig()) {
     Toast.info("请先配置 Gitlab 的 API URL 和 Token", "打开设置").then(
       (selection) => {
@@ -26,7 +27,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     );
-    return;
   }
 
   context.subscriptions.push(

@@ -10,7 +10,7 @@ import { Pipeline } from "./types/Pipeline";
 import { Tag } from "./types/Tag";
 import { BatchItemResult, BatchTarget, PublishEnv } from "./types/BatchPublish";
 import Modal from "./utils/modal";
-import { hasUncommitted } from "./utils/gitStatus";
+import { hasUncommitted, parsePorcelainFiles } from "./utils/gitStatus";
 import { isCjRemote } from "./utils/isCjRemote";
 
 const execAsync = promisify(exec);
@@ -678,7 +678,7 @@ export class GitlabService {
     if (["master", "release", "cn"].includes(currentBranch)) {
       throw new Error("这个分支不能发布到测试环境, 请切换至个人分支");
     }
-    if (currentBranch === "unknown") {
+    if (currentBranch === "未知分支") {
       throw new Error("获取当前分支失败");
     }
 
@@ -883,11 +883,7 @@ export class GitlabService {
 
   async getNoCommitFiles() {
     const status = await this.execCommand("git status --porcelain");
-    const files = status.split("\n").map((line) => line.trim().split(" ")[1]);
-    const noCommitFiles = files.filter(
-      (name) => Boolean(name) && name !== "undefined"
-    );
-    return noCommitFiles;
+    return parsePorcelainFiles(status);
   }
 
   async getPipelines(projectId: number, ref?: string): Promise<Pipeline[]> {

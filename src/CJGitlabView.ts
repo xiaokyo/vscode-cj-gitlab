@@ -11,6 +11,7 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import GitWatch from "./GitWatch";
+import { safeJsonForScript } from "./utils/safeJson";
 function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
@@ -34,8 +35,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private _pipelineInitialTimer?: NodeJS.Timeout;
   // 缓存上次推送数据的序列化结果，未变化则跳过 postMessage 避免 webview 重渲染
   private _lastPostHash: Record<string, string> = {};
-  // 跟踪 pipeline 真实状态，仅在翻转为 failed 时通知一次（不随 webview 重建重置）
-  private _lastPipelineStatus?: string;
+  // 按工作区跟踪 pipeline 真实状态，仅在翻转为 failed 时通知一次（不随 webview 重建重置）
+  private _lastPipelineStatus = new Map<string, string | undefined>();
   // 按工作区缓存上次的 __INITIAL_STATE__，切换项目时秒开占位，后台再刷新覆盖
   private _stateCache = new Map<string, any>();
   constructor(
@@ -577,14 +578,14 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         }
       }
 
-      // 状态翻转为 failed 时通知一次（同一失败 pipeline 不重复骚扰）
+      // 状态翻转为 failed 时通知一次（按工作区跟踪，同一失败 pipeline 不重复骚扰，切项目不互相抑制）
       if (
         latestPipeline?.status === "failed" &&
-        this._lastPipelineStatus !== "failed"
+        this._lastPipelineStatus.get(cacheKey) !== "failed"
       ) {
         void this.notifyPipelineFailed(latestPipeline);
       }
-      this._lastPipelineStatus = latestPipeline?.status;
+      this._lastPipelineStatus.set(cacheKey, latestPipeline?.status);
 
       // 异步期间已切换到别的工作区则丢弃，避免数据串到别的项目缓存/webview
       if (this._gitlabService.getCurrentWorkspaceRootPath() !== cacheKey) {
@@ -830,7 +831,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
                   ${indexTemplate}
 
                   <script>
-                     window.__INITIAL_STATE__ = ${JSON.stringify(initialState)};
+                     window.__INITIAL_STATE__ = ${safeJsonForScript(initialState)};
                   </script>
                   <script src="${scripts.main}"></script>
               </body>
