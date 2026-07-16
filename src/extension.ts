@@ -55,6 +55,15 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("cj-gitlab.openInEditor", () => {
+      void provider.openInEditor();
+    })
+  );
+
+  // 扩展停用时清理定时器与编辑面板
+  context.subscriptions.push({ dispose: () => provider.dispose() });
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("cj-gitlab.selectTargetProject", async () => {
       try {
         await provider.selectTargetProject();

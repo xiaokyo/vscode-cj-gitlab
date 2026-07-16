@@ -8,6 +8,8 @@ import {
   formatBatchSummary,
   BatchSummaryResult,
 } from "./utils/batchSummary";
+import { selectMergeInfosForClipboard } from "./utils/clipboardMergeInfos";
+import { buildHierarchicalQuickPickItems } from "./utils/projectHierarchy";
 import * as fs from "fs";
 import * as path from "path";
 import GitWatch from "./GitWatch";
@@ -27,6 +29,8 @@ function debounce<T extends (...args: any[]) => any>(
 
 export class CJGitlabView implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
+  // 编辑区面板：与侧边栏共享同一套控制与功能，数据实时同步
+  private _panel?: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _gitlabService: GitlabService;
   private debouncedUpdateContent: () => void;
@@ -39,6 +43,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   private _lastPipelineStatus = new Map<string, string | undefined>();
   // 按工作区缓存上次的 __INITIAL_STATE__，切换项目时秒开占位，后台再刷新覆盖
   private _stateCache = new Map<string, any>();
+  // 已挂载 HTML 的 webview：已挂载者刷新走增量 full_state，避免重建重置旁观 webview 状态
+  private _mountedWebviews = new Set<vscode.Webview>();
+  private _indexTemplate?: string;
   constructor(
     extensionUri: vscode.Uri,
     gitlabService: GitlabService,
@@ -48,6 +55,29 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     this._gitlabService = gitlabService;
     this._gitWatch = gitWatch;
     this.debouncedUpdateContent = debounce(this.updateContent.bind(this), 300);
+  }
+
+  /** 当前所有活跃 webview（侧边栏 + 编辑区面板），控制/推送统一走这里 */
+  private webviews(): vscode.Webview[] {
+    const list: vscode.Webview[] = [];
+    if (this._view) {
+      list.push(this._view.webview);
+    }
+    if (this._panel) {
+      list.push(this._panel.webview);
+    }
+    return list;
+  }
+
+  private hasView(): boolean {
+    return this.webviews().length > 0;
+  }
+
+  /** 向所有活跃 webview 广播消息 */
+  private postToAll(message: Record<string, any>) {
+    for (const w of this.webviews()) {
+      w.postMessage(message);
+    }
   }
 
   /** 发布前非阻塞提示：有未提交改动仅警告，不拦截流程 */
@@ -165,6 +195,14 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
    * 需求来源：6.11调整 第1次提交
    */
   public async batchMerge() {
+    try {
+      await this.batchMergeInner();
+    } catch (error: any) {
+      Toast.error(error?.message || "一键批量合并失败");
+    }
+  }
+
+  private async batchMergeInner() {
     const projectInfos =
       await this._gitlabService.getAllWorkspaceProjectInfos();
     if (projectInfos.length === 0) {
@@ -172,18 +210,33 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
 
-    const projectItems = projectInfos.map((p) => ({
-      label: p.name,
-      description: `分支: ${p.branch}${p.isSubmodule ? " · submodule" : ""}`,
-      picked: true,
-      fsPath: p.fsPath,
-    }));
+    // 父(工作区)→子(submodule) 层级展示：Separator 分组标题 + 子项缩进
+    type PickItem = vscode.QuickPickItem & {
+      fsPath?: string;
+    };
+    const projectItems: PickItem[] = buildHierarchicalQuickPickItems(
+      projectInfos.map((p) => ({ ...p, picked: true }))
+    ).map((it) =>
+      it.isSeparator
+        ? { label: it.label, kind: vscode.QuickPickItemKind.Separator }
+        : {
+            label: it.label,
+            description: it.description,
+            picked: it.picked,
+            fsPath: it.fsPath,
+          }
+    );
     const selectedProjects = await vscode.window.showQuickPick(projectItems, {
       title: "选择要合并的项目（默认全选）",
       placeHolder: "可多选，含 submodule 子项目",
       canPickMany: true,
     });
-    if (!selectedProjects || selectedProjects.length === 0) {
+    if (!selectedProjects) {
+      return;
+    }
+    // 过滤掉可能被选中的分组标题
+    const pickedProjects = selectedProjects.filter((p) => p.fsPath);
+    if (pickedProjects.length === 0) {
       return;
     }
 
@@ -202,9 +255,11 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
 
-    const targets: BatchTarget[] = selectedProjects.map((p) => ({
-      fsPath: p.fsPath,
-      name: p.label,
+    // 用原始项目名（label 含缩进前缀，故按 fsPath 回查干净名称）
+    const nameByPath = new Map(projectInfos.map((p) => [p.fsPath, p.name]));
+    const targets: BatchTarget[] = pickedProjects.map((p) => ({
+      fsPath: p.fsPath!,
+      name: nameByPath.get(p.fsPath!) ?? p.label,
     }));
     const envs = selectedEnvs.map((e) => e.env);
 
@@ -223,10 +278,8 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         })
     );
 
-    // cn/com 成功的 MR 信息汇总复制
-    const mergeInfos = results
-      .filter((r) => r.status === "success" && r.mergeInfo)
-      .map((r) => r.mergeInfo!);
+    // test/cn/com 三环境成功的 MR 信息汇总复制
+    const mergeInfos = selectMergeInfosForClipboard(results);
     if (mergeInfos.length > 0) {
       vscode.env.clipboard.writeText(mergeInfos.join("\n\n"));
     }
@@ -349,6 +402,170 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     Toast.info(`已切换目标项目: ${selectedFolder.name}`);
   }
 
+  /** 统一的 webview 消息处理（侧边栏与编辑区面板共用，保证控制/功能一致） */
+  private async handleMessage(data: any): Promise<void> {
+    switch (data.command) {
+      case "getProdAndCnInfo":
+        this.getProdAndCnInfo();
+        break;
+      case "copyLink":
+        try {
+          const content = await this.copyLink(data);
+          vscode.env.clipboard.writeText(content);
+          Toast.info(`已复制到剪贴板`);
+        } catch (error: any) {
+          Toast.error(error.message);
+        }
+        break;
+      case "showMessage":
+        Toast.info(data.content);
+        break;
+      case "copyText":
+        vscode.env.clipboard.writeText(data.content);
+        Toast.info(`${data.content}, 已复制到剪贴板`);
+        break;
+      case "copyBranch":
+        vscode.env.clipboard.writeText(data.content);
+        Toast.info(`分支名 "${data.content}" 已复制到剪贴板`);
+        break;
+      case "switchBranch":
+        this.switchBranch();
+        break;
+      case "publishToProd":
+        this.publishToProd();
+        break;
+      case "publishToCn":
+        this.publishToCn();
+        break;
+      case "publishToTest":
+        this.publishToTest();
+        break;
+      case "batchMerge":
+        this.batchMerge();
+        break;
+      case "commitAndPush":
+        this.commitAndPush();
+        break;
+      case "retryPipeline":
+        this.retryPipeline(data.pipelineId);
+        break;
+      case "selectTargetProject":
+        try {
+          await this.selectTargetProject();
+        } catch (error: any) {
+          Toast.error(error.message || "切换目标项目失败");
+        }
+        break;
+      case "switchProject":
+        try {
+          const folder = vscode.workspace.workspaceFolders?.find(
+            (f) => f.uri.fsPath === data.fsPath
+          );
+          if (folder) {
+            this._gitlabService.setTargetProjectByWorkspaceFolder(folder);
+            await this.refresh();
+          } else {
+            // 尝试作为 submodule 处理
+            this._gitlabService.setTargetProjectByWorkspaceFolder({
+              uri: vscode.Uri.file(data.fsPath),
+              name: data.fsPath.split("/").pop() || "unknown",
+              index: -1,
+            } as vscode.WorkspaceFolder);
+            await this.refresh();
+          }
+        } catch (error: any) {
+          Toast.error(error.message || "切换项目失败");
+        }
+        break;
+      case "openFile":
+        try {
+          const workspaceFolder = vscode.workspace.workspaceFolders?.find(
+            (folder) =>
+              folder.uri.fsPath ===
+              this._gitlabService.getCurrentWorkspaceRootPath()
+          );
+          if (workspaceFolder) {
+            this._gitlabService.setTargetProjectByWorkspaceFolder(
+              workspaceFolder
+            );
+          }
+          const filePath = vscode.Uri.file(
+            path.join(
+              this._gitlabService.getCurrentWorkspaceRootPath(),
+              data.content
+            )
+          );
+          vscode.window.showTextDocument(filePath);
+        } catch (error: any) {
+          Toast.error(error.message);
+        }
+        break;
+    }
+  }
+
+  /**
+   * 在编辑区打开面板：控制与功能与侧边栏完全一致，数据实时同步。
+   * 已存在则聚焦，不重复创建。
+   */
+  public async openInEditor(): Promise<void> {
+    if (this._panel) {
+      // 保留用户已拖动的列，不强制拽回 Active
+      this._panel.reveal(this._panel.viewColumn ?? vscode.ViewColumn.Active);
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      "cjGitlabPanel",
+      "CJ GitLab",
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [this._extensionUri],
+      }
+    );
+    this._panel = panel;
+
+    panel.webview.onDidReceiveMessage((data) => this.handleMessage(data));
+
+    panel.onDidChangeViewState(() => {
+      // 任一 webview 活跃则保持轮询；全部不活跃才停，避免空转
+      if (this.anyWebviewActive()) {
+        this.startPipelineTimer();
+      } else {
+        this.stopPipelineTimer();
+      }
+    });
+
+    panel.onDidDispose(() => {
+      this._mountedWebviews.delete(panel.webview);
+      this._panel = undefined;
+      // 侧边栏也不在则停掉定时器
+      if (!this.hasView()) {
+        this.stopPipelineTimer();
+      }
+    });
+
+    // 重建 HTML 会重置内部状态，清缓存让定时器重新推送
+    this._lastPostHash = {};
+    await this.updateContent();
+    this.startPipelineTimer();
+  }
+
+  /** 是否有活跃/可见的 webview（侧边栏可见 或 面板活跃），用于定时器门控 */
+  private anyWebviewActive(): boolean {
+    return Boolean(this._view?.visible) || Boolean(this._panel?.active);
+  }
+
+  /** 扩展停用时清理：停定时器、销毁编辑面板，避免泄漏 */
+  public dispose(): void {
+    this.stopPipelineTimer();
+    if (this._panel) {
+      this._panel.dispose();
+      this._panel = undefined;
+    }
+  }
+
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
@@ -360,116 +577,26 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    webviewView.webview.onDidReceiveMessage(async (data) => {
-      switch (data.command) {
-        case "getProdAndCnInfo":
-          this.getProdAndCnInfo();
-          break;
-        case "copyLink":
-          try {
-            const content = await this.copyLink(data);
-            vscode.env.clipboard.writeText(content);
-            Toast.info(`已复制到剪贴板`);
-          } catch (error: any) {
-            Toast.error(error.message);
-          }
-          break;
-        case "showMessage":
-          Toast.info(data.content);
-          break;
-        case "copyText":
-          vscode.env.clipboard.writeText(data.content);
-          Toast.info(`${data.content}, 已复制到剪贴板`);
-          break;
-        case "copyBranch":
-          vscode.env.clipboard.writeText(data.content);
-          Toast.info(`分支名 "${data.content}" 已复制到剪贴板`);
-          break;
-        case "switchBranch":
-          this.switchBranch();
-          break;
-        case "publishToProd":
-          this.publishToProd();
-          break;
-        case "publishToCn":
-          this.publishToCn();
-          break;
-        case "publishToTest":
-          this.publishToTest();
-          break;
-        case "batchMerge":
-          this.batchMerge();
-          break;
-        case "commitAndPush":
-          this.commitAndPush();
-          break;
-        case "retryPipeline":
-          this.retryPipeline(data.pipelineId);
-          break;
-        case "selectTargetProject":
-          try {
-            await this.selectTargetProject();
-          } catch (error: any) {
-            Toast.error(error.message || "切换目标项目失败");
-          }
-          break;
-        case "switchProject":
-          try {
-            const folder = vscode.workspace.workspaceFolders?.find(
-              (f) => f.uri.fsPath === data.fsPath
-            );
-            if (folder) {
-              this._gitlabService.setTargetProjectByWorkspaceFolder(folder);
-              await this.refresh();
-            } else {
-              // 尝试作为 submodule 处理
-              this._gitlabService.setTargetProjectByWorkspaceFolder({
-                uri: vscode.Uri.file(data.fsPath),
-                name: data.fsPath.split("/").pop() || "unknown",
-                index: -1,
-              } as vscode.WorkspaceFolder);
-              await this.refresh();
-            }
-          } catch (error: any) {
-            Toast.error(error.message || "切换项目失败");
-          }
-          break;
-        case "openFile":
-          try {
-            const workspaceFolder = vscode.workspace.workspaceFolders?.find(
-              (folder) =>
-                folder.uri.fsPath === this._gitlabService.getCurrentWorkspaceRootPath()
-            );
-            if (workspaceFolder) {
-              this._gitlabService.setTargetProjectByWorkspaceFolder(workspaceFolder);
-            }
-            const filePath = vscode.Uri.file(
-              path.join(
-                this._gitlabService.getCurrentWorkspaceRootPath(),
-                data.content
-              )
-            );
-            vscode.window.showTextDocument(filePath);
-          } catch (error: any) {
-            Toast.error(error.message);
-          }
-          break;
-      }
-    });
+    webviewView.webview.onDidReceiveMessage((data) => this.handleMessage(data));
 
     // Listen for visibility changes to refresh content
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.debouncedUpdateContent();
         this.startPipelineTimer();
-      } else {
+      } else if (!this.anyWebviewActive()) {
+        // 侧边栏隐藏时，若编辑面板仍活跃则保持轮询，避免误停面板刷新
         this.stopPipelineTimer();
       }
     });
 
     // Listen for dispose event to clean up timer
     webviewView.onDidDispose(() => {
-      this.stopPipelineTimer();
+      this._mountedWebviews.delete(webviewView.webview);
+      this._view = undefined;
+      if (!this.hasView()) {
+        this.stopPipelineTimer();
+      }
     });
 
     this._gitWatch.add(this.debouncedUpdateContent.bind(this));
@@ -479,21 +606,11 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   }
 
   private setLoading(loading: boolean, env: "test" | "cn" | "prod" = "test") {
-    if (!this._view) {
-      return;
-    }
-    this._view.webview.postMessage({
-      type: "setLoading",
-      loading,
-      env,
-    });
+    this.postToAll({ type: "setLoading", loading, env });
   }
 
   private setMergeLink(link: string, env: "test" | "cn" | "prod") {
-    if (!this._view) {
-      return;
-    }
-    this._view.webview.postMessage({ type: "merge_link", link, env });
+    this.postToAll({ type: "merge_link", link, env });
   }
 
   private startPipelineTimer() {
@@ -526,7 +643,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
    * 数据相比上次未变化则跳过 postMessage，减少 webview 无谓重渲染
    */
   private postIfChanged(key: string, message: Record<string, any>) {
-    if (!this._view) {
+    if (!this.hasView()) {
       return;
     }
     const hash = JSON.stringify(message);
@@ -534,11 +651,11 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
       return;
     }
     this._lastPostHash[key] = hash;
-    this._view.webview.postMessage(message);
+    this.postToAll(message);
   }
 
   private async updatePipelineAndTagStatus() {
-    if (!this._view) {
+    if (!this.hasView()) {
       return;
     }
 
@@ -653,7 +770,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
-  private getScriptUris() {
+  private getScriptUris(webview: vscode.Webview) {
     const scripts = {
       main: ["webview", "main.js"],
       vue: ["assets", "js", "vue.2.7.16.min.js"],
@@ -661,7 +778,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     };
 
     return Object.entries(scripts).reduce((acc, [key, paths]) => {
-      acc[key] = this._view!.webview.asWebviewUri(
+      acc[key] = webview.asWebviewUri(
         vscode.Uri.joinPath(this._extensionUri, "resources", ...paths)
       );
       return acc;
@@ -669,7 +786,7 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
   }
 
   private async updateContent() {
-    if (!this._view) {
+    if (!this.hasView()) {
       return;
     }
 
@@ -680,14 +797,9 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     const currentBranch = await this._gitlabService.getCurrentBranch();
 
     if (!projectInfo.id) {
-      this._view.webview.html = `
-          <!DOCTYPE html>
-          <html>
-              <body>
-                  <h2>当前不是 CJ 的项目</h2>
-              </body>
-          </html>
-        `;
+      this.setHtmlForAll(
+        `<!DOCTYPE html><html><body><h2>当前不是 CJ 的项目</h2></body></html>`
+      );
       return;
     }
 
@@ -802,11 +914,33 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
     }
   }
 
-  private renderWebviewHtml(initialState: any) {
-    if (!this._view) {
-      return;
+  private setHtmlForAll(html: string) {
+    for (const w of this.webviews()) {
+      w.html = html;
+      // 占位/错误页无 Vue 监听器，标记为未挂载，下次有效渲染重建整页而非发 full_state
+      this._mountedWebviews.delete(w);
     }
-    const styleUri = this._view.webview.asWebviewUri(
+  }
+
+  /** index.html 模板读一次缓存，避免每次渲染同步读盘 */
+  private getIndexTemplate(): string {
+    if (this._indexTemplate === undefined) {
+      this._indexTemplate = fs.readFileSync(
+        path.join(
+          this._extensionUri.fsPath,
+          "resources",
+          "webview",
+          "index.html"
+        ),
+        "utf-8"
+      );
+    }
+    return this._indexTemplate;
+  }
+
+  /** 为指定 webview 构建完整 HTML（每个 webview 需各自的 asWebviewUri） */
+  private buildHtml(webview: vscode.Webview, initialState: any): string {
+    const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this._extensionUri,
         "resources",
@@ -814,13 +948,10 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
         "styles.css"
       )
     );
-    const scripts = this.getScriptUris();
-    const indexTemplate = fs.readFileSync(
-      path.join(this._extensionUri.fsPath, "resources", "webview", "index.html"),
-      "utf-8"
-    );
+    const scripts = this.getScriptUris(webview);
+    const indexTemplate = this.getIndexTemplate();
 
-    this._view.webview.html = `
+    return `
           <!DOCTYPE html>
           <html>
               <head>
@@ -837,5 +968,20 @@ export class CJGitlabView implements vscode.WebviewViewProvider {
               </body>
           </html>
       `;
+  }
+
+  /**
+   * 尚未挂载的 webview 重建 HTML（首帧）；已挂载的走 full_state 增量刷新，
+   * 避免整页重建把旁观 webview 的 loading/链接/搜索/滚动等瞬时状态清空。
+   */
+  private renderWebviewHtml(initialState: any) {
+    for (const w of this.webviews()) {
+      if (this._mountedWebviews.has(w)) {
+        w.postMessage({ type: "full_state", state: initialState });
+      } else {
+        w.html = this.buildHtml(w, initialState);
+        this._mountedWebviews.add(w);
+      }
+    }
   }
 }

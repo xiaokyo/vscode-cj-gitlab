@@ -258,6 +258,22 @@ new Vue({
           case "env_branches":
             this.$set(this.state, 'envBranches', data.envBranches || {});
             break;
+          case "full_state": {
+            // 已挂载 webview 的整体数据刷新：仅更新数据，不重建实例
+            // 保留本地瞬时 UI（loading/mergeLinks/搜索关键字/展开态/滚动）
+            const s = data.state || {};
+            this.$set(this.state, 'projectInfo', s.projectInfo);
+            this.$set(this.state, 'currentBranch', s.currentBranch);
+            this.$set(this.state, 'currentWorkspaceName', s.currentWorkspaceName);
+            this.$set(this.state, 'stashFiles', s.stashFiles || []);
+            this.$set(this.state, 'workspaceTabs', s.workspaceTabs || []);
+            this.$set(this.state, 'envBranches', s.envBranches || {});
+            this.pipelineInfo = s.latestPipeline;
+            this.tagInfo = s.latestTag;
+            this.activeMergeRequests = s.activeMergeRequests || [];
+            this.pipelineMergedMRs = s.pipelineMergedMRs || [];
+            break;
+          }
           default:
             break;
         }

@@ -12,6 +12,7 @@ import { BatchItemResult, BatchTarget, PublishEnv } from "./types/BatchPublish";
 import Modal from "./utils/modal";
 import { hasUncommitted, parsePorcelainFiles } from "./utils/gitStatus";
 import { isCjRemote } from "./utils/isCjRemote";
+import { buildHierarchicalQuickPickItems } from "./utils/projectHierarchy";
 
 const execAsync = promisify(exec);
 
@@ -153,30 +154,63 @@ export class GitlabService {
       throw new Error("未打开工作区");
     }
 
-    if (workspaceFolders.length === 1) {
-      this.setTargetProjectByWorkspaceFolder(workspaceFolders[0]);
-      return workspaceFolders[0];
+    // 含 submodule 子项目的完整列表（父→子层级）
+    const projectInfos = await this.getAllWorkspaceProjectInfos();
+
+    // 工作区已打开但无 cj 项目：提前报错，避免弹空浮层静默无反馈
+    if (projectInfos.length === 0) {
+      throw new Error("未找到可操作的 GitLab 项目");
     }
 
-    const quickPickItems = workspaceFolders.map((folder) => ({
-      label: folder.name,
-      description: folder.uri.fsPath,
-      folder,
-      picked: folder.uri.fsPath === this.getCurrentWorkspaceRootPath(),
-    }));
+    // 仅一个可选项目（无 submodule 的单工作区）直接选中
+    if (projectInfos.length === 1) {
+      const only = this.toPseudoFolder(projectInfos[0].fsPath, projectInfos[0].name);
+      this.setTargetProjectByWorkspaceFolder(only);
+      return only;
+    }
 
-    const selected = await vscode.window.showQuickPick(quickPickItems, {
+    const currentPath = this.getCurrentWorkspaceRootPath();
+    type PickItem = vscode.QuickPickItem & { fsPath?: string; name?: string };
+    const items: PickItem[] = buildHierarchicalQuickPickItems(
+      projectInfos.map((p) => ({ ...p, picked: p.fsPath === currentPath }))
+    ).map((it) =>
+      it.isSeparator
+        ? { label: it.label, kind: vscode.QuickPickItemKind.Separator }
+        : {
+            label: it.label,
+            description: it.description,
+            picked: it.picked,
+            fsPath: it.fsPath,
+          }
+    );
+    // fsPath -> 原始项目名（label 含缩进前缀）
+    const nameByPath = new Map(projectInfos.map((p) => [p.fsPath, p.name]));
+
+    const selected = await vscode.window.showQuickPick(items, {
       title: "选择目标项目",
-      placeHolder: "请选择要执行 GitLab/Git 操作的工作区项目",
+      placeHolder: "请选择要执行 GitLab/Git 操作的项目（含 submodule）",
       canPickMany: false,
     });
 
-    if (!selected) {
+    if (!selected || !selected.fsPath) {
       return null;
     }
 
-    this.setTargetProjectByWorkspaceFolder(selected.folder);
-    return selected.folder;
+    const folder = this.toPseudoFolder(
+      selected.fsPath,
+      nameByPath.get(selected.fsPath) ?? selected.label
+    );
+    this.setTargetProjectByWorkspaceFolder(folder);
+    return folder;
+  }
+
+  /** 由 fsPath/name 构造伪 WorkspaceFolder，供 submodule 作为目标项目（参照 batchPublish 写法） */
+  private toPseudoFolder(fsPath: string, name: string): vscode.WorkspaceFolder {
+    return {
+      uri: vscode.Uri.file(fsPath),
+      name,
+      index: -1,
+    } as vscode.WorkspaceFolder;
   }
 
   private async execCommand(command: string): Promise<string> {
@@ -282,6 +316,7 @@ export class GitlabService {
       fsPath: string;
       isActive: boolean;
       isSubmodule?: boolean;
+      parentPath?: string;
     }>
   > {
     const workspaceFolders = vscode.workspace.workspaceFolders || [];
@@ -292,6 +327,7 @@ export class GitlabService {
       fsPath: string;
       isActive: boolean;
       isSubmodule?: boolean;
+      parentPath?: string;
     };
 
     // 工作区分支查询与 submodule 读取按 folder 并行，避免串行 spawn 进程线性叠加
@@ -344,6 +380,7 @@ export class GitlabService {
               fsPath: submodulePath,
               isActive: submodulePath === currentPath,
               isSubmodule: true,
+              parentPath: folder.uri.fsPath,
             });
           }
         } catch (err) {
@@ -1010,7 +1047,7 @@ export class GitlabService {
       com: "线上(COM)",
     };
     const commitLastLog = await this.getCommitLogLastTitle();
-    return `项目名称：${projectInfo.name}\ncommit信息: ${commitLastLog}\n合并环境: ${envMap[env]}\n链接: ${webUrl}`;
+    return `项目名称：${projectInfo.name}\ncommit信息: ${commitLastLog}\n合并环境: ${envMap[env]}\n链接: ${webUrl || "(无链接)"}`;
   }
 
   /**
@@ -1065,9 +1102,8 @@ export class GitlabService {
             webUrl: mr.web_url,
             warning: dirty ? "有未提交改动，未包含在本次合并" : undefined,
           };
-          if (env !== "test") {
-            item.mergeInfo = await this.buildMergeInfo(env, mr.web_url);
-          }
+          // 三环境(含 test)均生成 MR 信息供复制到剪贴板
+          item.mergeInfo = await this.buildMergeInfo(env, mr.web_url);
           results.push(item);
         } catch (err: any) {
           const message = err?.message || "未知错误";
